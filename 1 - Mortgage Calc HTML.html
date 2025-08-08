@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mortgage Payment Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .kakapo-container {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        .kakapo {
+            width: 250px;
+            height: 250px;
+            background-image: url('https://i.giphy.com/media/hs1wRfnQjI6aI/giphy.gif');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+        .scenario-card {
+            transition: all 0.3s ease-in-out;
+            background-color: #fff;
+        }
+        .scenario-card.correct {
+            background-color: #F0FDF4; /* light green */
+            border-color: #22C55E;
+        }
+        .scenario-card.incorrect {
+            background-color: #FEF2F2; /* light red */
+            border-color: #EF4444;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+            <header class="text-center mb-6">
+                <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">Mortgage Payment Calculator</h1>
+                <p class="text-gray-600 mt-2">Practice your financial calculation skills!</p>
+            </header>
+
+            <div id="problem-container" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-lg text-gray-700">Property Value:</h3>
+                        <p id="property-value" class="text-2xl font-bold text-indigo-600"></p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-lg text-gray-700">Loan-to-Value (LTV):</h3>
+                        <p id="ltv-ratio" class="text-2xl font-bold text-indigo-600"></p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-lg text-gray-700">Annual Interest Rate:</h3>
+                        <p id="interest-rate" class="text-2xl font-bold text-indigo-600"></p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-lg text-gray-700">Amortization Structure:</h3>
+                        <p id="amortization-structure" class="text-xl font-bold text-indigo-600"></p>
+                    </div>
+                    <div id="balloon-payment-display" class="hidden md:col-span-2 bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+                        <h3 class="font-semibold text-lg text-red-800">Balloon Payment:</h3>
+                        <p id="balloon-payment-amount" class="text-2xl font-bold text-red-600"></p>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <label for="student-answer" class="block text-lg font-medium text-gray-700">Your Calculated Monthly Payment ($):</label>
+                    <div class="mt-2 flex flex-col sm:flex-row items-center gap-4">
+                        <input type="number" id="student-answer" class="flex-grow w-full px-4 py-2 text-lg border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Enter your answer">
+                        <button id="check-answer" class="w-full sm:w-auto bg-indigo-600 text-white font-bold py-2 px-6 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">Check Answer</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="all-scenarios-container" class="hidden mt-8">
+                 <h2 class="text-2xl font-bold text-center mb-4 text-gray-800">Solve All 10 Scenarios</h2>
+                 <div id="scenario-details" class="mb-6 p-4 bg-gray-50 rounded-lg">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                        <div>
+                            <h4 class="font-semibold text-gray-600 text-sm">Property Value</h4>
+                            <p id="scenario-property-value" class="font-bold text-lg text-indigo-600"></p>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-600 text-sm">LTV</h4>
+                            <p id="scenario-ltv" class="font-bold text-lg text-indigo-600"></p>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-600 text-sm">Interest Rate</h4>
+                            <p id="scenario-rate" class="font-bold text-lg text-indigo-600"></p>
+                        </div>
+                    </div>
+                 </div>
+                 <p class="text-center text-gray-600 mb-6">Calculate the payment for each scenario below. The balloon payment is consistent for all Partial loans, and for all Negative loans.</p>
+                 <div id="scenarios-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <!-- Interactive scenario cards will be injected here -->
+                 </div>
+                 <div class="mt-6">
+                    <canvas id="amortization-chart"></canvas>
+                 </div>
+            </div>
+
+
+            <div id="feedback-container" class="mt-6 p-4 rounded-md text-center hidden">
+                <p id="feedback-text" class="text-xl font-bold"></p>
+                <div id="hint-text" class="text-md mt-2"></div>
+            </div>
+
+            <div class="mt-8 text-center">
+                <button id="new-problem" class="bg-green-600 text-white font-bold py-3 px-8 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out hidden">New Problem</button>
+                <button id="toggle-scenarios" class="bg-blue-600 text-white font-bold py-3 px-8 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">Toggle All Scenarios View</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="kakapo-container" class="kakapo-container">
+        <div class="kakapo"></div>
+    </div>
+
+    <script>
+        // --- DOM Element References ---
+        const propertyValueEl = document.getElementById('property-value');
+        const ltvRatioEl = document.getElementById('ltv-ratio');
+        const interestRateEl = document.getElementById('interest-rate');
+        const amortizationStructureEl = document.getElementById('amortization-structure');
+        const studentAnswerEl = document.getElementById('student-answer');
+        const checkAnswerBtn = document.getElementById('check-answer');
+        const newProblemBtn = document.getElementById('new-problem');
+        const feedbackContainer = document.getElementById('feedback-container');
+        const feedbackText = document.getElementById('feedback-text');
+        const hintText = document.getElementById('hint-text');
+        const balloonDisplayEl = document.getElementById('balloon-payment-display');
+        const balloonAmountEl = document.getElementById('balloon-payment-amount');
+        const kakapoContainer = document.getElementById('kakapo-container');
+        const toggleScenariosBtn = document.getElementById('toggle-scenarios');
+        const allScenariosContainer = document.getElementById('all-scenarios-container');
+        const problemContainer = document.getElementById('problem-container');
+        const scenariosGrid = document.getElementById('scenarios-grid');
+        const chartCanvas = document.getElementById('amortization-chart');
+        let amortizationChart = null;
+
+
+        // --- State Variables ---
+        let state = {
+            propertyValue: 0,
+            ltv: 0,
+            annualRate: 0,
+            loanAmount: 0,
+            isAllScenariosView: false,
+            // For single problem view
+            singleProblem: {
+                amortizationType: '',
+                termYears: 0,
+                correctAnswer: 0,
+                problemFv: 0,
+                fvFactor: 0,
+                attempts: 0,
+            },
+            // For all scenarios view
+            scenarios: [],
+            partialFvFactor: 0,
+            negativeFvFactor: 0,
+        };
+
+        // --- Core Logic ---
+
+        async function fetchInterestRate() {
+            try {
+                const baseRate = 6.5;
+                const randomFluctuation = (Math.random() * 1.5) - 0.75;
+                const rawRate = baseRate + randomFluctuation;
+                const roundedRate = Math.round(rawRate / 0.125) * 0.125;
+                return roundedRate.toFixed(3);
+            } catch (error) {
+                console.error("Failed to fetch interest rate. Using a default value.", error);
+                return 6.875;
+            }
+        }
+
+        async function generateNewProblem() {
+            state.propertyValue = Math.round((Math.random() * (2000000 - 300000) + 300000) / 1000) * 1000;
+            state.ltv = Math.round(Math.random() * (80 - 65) + 65) / 100;
+            state.annualRate = await fetchInterestRate();
+            state.loanAmount = state.propertyValue * state.ltv;
+            
+            state.partialFvFactor = Math.random() * (0.9 - 0.1) + 0.1;
+            state.negativeFvFactor = Math.random() * (1.9 - 1.1) + 1.1;
+
+            const amortizationOptions = [
+                { type: 'Full', term: 15 }, { type: 'Full', term: 20 }, { type: 'Full', term: 30 },
+                { type: 'Partial', term: 15 }, { type: 'Partial', term: 20 }, { type: 'Partial', term: 30 },
+                { type: 'Interest Only', term: 15 },
+                { type: 'Negative', term: 15 }, { type: 'Negative', term: 20 }, { type: 'Negative', term: 30 }
+            ];
+            const randomIndex = Math.floor(Math.random() * amortizationOptions.length);
+            const selectedOption = amortizationOptions[randomIndex];
+            
+            state.singleProblem.amortizationType = selectedOption.type;
+            state.singleProblem.termYears = selectedOption.term;
+            state.singleProblem.attempts = 0;
+            
+            let fvFactor = 0;
+            if (selectedOption.type === 'Partial') fvFactor = state.partialFvFactor;
+            if (selectedOption.type === 'Negative') fvFactor = state.negativeFvFactor;
+
+            const calculationResult = calculatePayment(state.loanAmount, state.annualRate, selectedOption.term, selectedOption.type, fvFactor);
+            state.singleProblem.correctAnswer = calculationResult.payment;
+            state.singleProblem.problemFv = calculationResult.fv;
+
+            state.scenarios = amortizationOptions.map(opt => {
+                let factor = 0;
+                if (opt.type === 'Partial') factor = state.partialFvFactor;
+                if (opt.type === 'Negative') factor = state.negativeFvFactor;
+                const calc = calculatePayment(state.loanAmount, state.annualRate, opt.term, opt.type, factor);
+                return { ...opt, correctAnswer: calc.payment, fv: calc.fv, studentAnswer: '', isLocked: false, isCorrect: null, attempts: 0 };
+            });
+
+            resetUIForNewProblem();
+            updateProblemDisplay();
+        }
+        
+        function calculatePayment(pv, annualRate, termYears, type, fvFactor) {
+            const i = annualRate / 100 / 12; 
+            const n = termYears * 12; 
+            let fv_signed = 0;
+
+            switch (type) {
+                case 'Full': fv_signed = 0; break;
+                case 'Partial': fv_signed = -(pv * fvFactor); break;
+                case 'Interest Only': fv_signed = -pv; break;
+                case 'Negative': fv_signed = -(pv * fvFactor); break;
+            }
+
+            let payment = 0;
+            if (i === 0) {
+                payment = n > 0 ? -(pv + fv_signed) / n : 0;
+            } else {
+                const pmt_numerator = pv * Math.pow(1 + i, n) + fv_signed;
+                const pmt_denominator = Math.pow(1 + i, n) - 1;
+                payment = pmt_denominator !== 0 ? -(pmt_numerator / pmt_denominator) * i : 0;
+            }
+            
+            return { payment: payment, fv: Math.abs(fv_signed) };
+        }
+
+        function checkAnswer() {
+            const studentAnswer = parseFloat(studentAnswerEl.value);
+            if (isNaN(studentAnswer)) {
+                showFeedback("Please enter a valid number.", "error");
+                return;
+            }
+
+            state.singleProblem.attempts++;
+            const difference = Math.abs(Math.abs(studentAnswer) - Math.abs(state.singleProblem.correctAnswer));
+
+            if (difference <= 2.00) {
+                showFeedback("Correct!", "success");
+                hintText.innerHTML = '';
+                lockProblem();
+                playKakapoAnimation();
+            } else {
+                if (state.singleProblem.attempts === 1) {
+                    showFeedback("Incorrect. Try again!", "error");
+                    provideHint();
+                } else {
+                    showFeedback("Incorrect. Please review the calculator inputs below.", "error");
+                    discloseInputsOnFailure();
+                    lockProblem();
+                }
+            }
+        }
+        
+        function discloseInputsOnFailure() {
+            const { loanAmount, annualRate } = state;
+            const { termYears, problemFv, amortizationType } = state.singleProblem;
+            const n_val = termYears * 12;
+            const iy_val = (annualRate / 12).toFixed(4);
+            const pv_val = loanAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            
+            let fv_for_input = amortizationType === 'Interest Only' ? -loanAmount : -problemFv;
+            const fv_val_display = fv_for_input.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            hintText.innerHTML = `<div class="text-left w-full max-w-sm mx-auto mt-4 p-4 bg-gray-50 rounded-lg grid grid-cols-2 gap-x-4 gap-y-2"><div class="font-semibold text-gray-700">PV:</div><div class="font-mono text-gray-900">$${pv_val}</div><div class="font-semibold text-gray-700">I/Y:</div><div class="font-mono text-gray-900">${iy_val}%</div><div class="font-semibold text-gray-700">N:</div><div class="font-mono text-gray-900">${n_val}</div><div class="font-semibold text-gray-700">FV:</div><div class="font-mono text-gray-900">$${fv_val_display}</div></div>`;
+        }
+
+        function provideHint() {
+            const { loanAmount, annualRate } = state;
+            const { termYears, problemFv, amortizationType } = state.singleProblem;
+            
+            const n = termYears * 12;
+            const iy = (annualRate / 12).toFixed(4);
+            const pv = loanAmount;
+            let fvForHint = amortizationType === 'Interest Only' ? loanAmount : problemFv;
+
+            const hints = [{ name: 'N', value: n }, { name: 'I/Y', value: `${iy}%` }, { name: 'PV', value: `$${pv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }];
+            if (fvForHint > 0) hints.push({ name: 'FV', value: `-$${fvForHint.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` });
+
+            const randomHint = hints[Math.floor(Math.random() * hints.length)];
+            hintText.innerHTML = `<span>Hint: Check your value for ${randomHint.name}. The correct value is ${randomHint.value}.</span>`;
+        }
+
+        function updateProblemDisplay() {
+            propertyValueEl.textContent = `$${state.propertyValue.toLocaleString()}`;
+            ltvRatioEl.textContent = `${(state.ltv * 100).toFixed(0)}%`;
+            interestRateEl.textContent = `${state.annualRate}%`;
+            
+            const { termYears, amortizationType, problemFv } = state.singleProblem;
+            amortizationStructureEl.textContent = `${termYears}-Year, ${amortizationType} Amortization`;
+
+            if (amortizationType === 'Partial' || amortizationType === 'Negative') {
+                balloonAmountEl.textContent = `$${problemFv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                balloonDisplayEl.classList.remove('hidden');
+            } else {
+                balloonDisplayEl.classList.add('hidden');
+            }
+        }
+
+        function resetUIForNewProblem() {
+            state.singleProblem.attempts = 0;
+            studentAnswerEl.value = '';
+            studentAnswerEl.disabled = false;
+            checkAnswerBtn.disabled = false;
+            checkAnswerBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+            checkAnswerBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            newProblemBtn.classList.add('hidden');
+            feedbackContainer.classList.add('hidden');
+            hintText.innerHTML = '';
+            if (amortizationChart) {
+                amortizationChart.destroy();
+                amortizationChart = null;
+            }
+        }
+
+        function lockProblem() {
+            studentAnswerEl.disabled = true;
+            checkAnswerBtn.disabled = true;
+            checkAnswerBtn.classList.add('bg-gray-400', 'cursor-not-allowed');
+            checkAnswerBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+            newProblemBtn.classList.remove('hidden');
+        }
+
+        function showFeedback(message, type) {
+            feedbackText.textContent = message;
+            feedbackContainer.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700');
+            if (type === 'success') feedbackContainer.classList.add('bg-green-100', 'text-green-700');
+            else feedbackContainer.classList.add('bg-red-100', 'text-red-700');
+        }
+        
+        function playKakapoAnimation() {
+            kakapoContainer.style.display = 'flex';
+            setTimeout(() => { kakapoContainer.style.display = 'none'; }, 4000);
+        }
+
+        function toggleAllScenariosView() {
+            state.isAllScenariosView = !state.isAllScenariosView;
+            
+            if (state.isAllScenariosView) {
+                problemContainer.classList.add('hidden');
+                allScenariosContainer.classList.remove('hidden');
+                toggleScenariosBtn.textContent = 'Back to Single Problem';
+                newProblemBtn.classList.add('hidden');
+                feedbackContainer.classList.add('hidden');
+                setupAllScenariosView();
+            } else {
+                problemContainer.classList.remove('hidden');
+                allScenariosContainer.classList.add('hidden');
+                toggleScenariosBtn.textContent = 'Toggle All Scenarios View';
+                if (studentAnswerEl.disabled) newProblemBtn.classList.remove('hidden');
+            }
+        }
+        
+        // --- All Scenarios View Logic ---
+        function setupAllScenariosView() {
+            scenariosGrid.innerHTML = '';
+            if (amortizationChart) {
+                amortizationChart.destroy();
+                amortizationChart = null;
+            }
+
+            document.getElementById('scenario-property-value').textContent = `$${state.propertyValue.toLocaleString()}`;
+            document.getElementById('scenario-ltv').textContent = `${(state.ltv * 100).toFixed(0)}%`;
+            document.getElementById('scenario-rate').textContent = `${state.annualRate}%`;
+            
+            state.scenarios.forEach((scenario, index) => {
+                const card = document.createElement('div');
+                card.id = `scenario-card-${index}`;
+                card.className = 'scenario-card p-4 rounded-lg border border-gray-200 shadow-sm space-y-2';
+                
+                let balloonInfo = '';
+                if (scenario.type === 'Partial' || scenario.type === 'Negative') {
+                    balloonInfo = `<p class="text-xs text-gray-600">Balloon: $${scenario.fv.toLocaleString('en-US', { maximumFractionDigits: 2 })}</p>`;
+                }
+
+                card.innerHTML = `
+                    <h4 class="font-bold text-md text-gray-800">${scenario.term}-Year ${scenario.type}</h4>
+                    ${balloonInfo}
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="scenario-input-${index}" class="flex-grow w-full px-2 py-1 text-sm border-gray-300 rounded-md shadow-sm" placeholder="Payment">
+                        <button id="scenario-btn-${index}" class="text-sm bg-indigo-500 text-white font-bold py-1 px-3 rounded-md hover:bg-indigo-600">Check</button>
+                    </div>
+                    <div id="scenario-feedback-${index}" class="text-xs font-semibold text-center h-4"></div>
+                `;
+                scenariosGrid.appendChild(card);
+
+                document.getElementById(`scenario-btn-${index}`).addEventListener('click', () => checkScenarioAnswer(index));
+            });
+        }
+
+        function checkScenarioAnswer(index) {
+            const scenario = state.scenarios[index];
+            if (scenario.isLocked) return;
+
+            const inputEl = document.getElementById(`scenario-input-${index}`);
+            const studentAnswer = parseFloat(inputEl.value);
+            
+            if (isNaN(studentAnswer)) return;
+
+            scenario.attempts++;
+            const difference = Math.abs(Math.abs(studentAnswer) - Math.abs(scenario.correctAnswer));
+            const feedbackEl = document.getElementById(`scenario-feedback-${index}`);
+            const cardEl = document.getElementById(`scenario-card-${index}`);
+
+            if (difference <= 2.00) {
+                scenario.isCorrect = true;
+                scenario.isLocked = true;
+                feedbackEl.textContent = 'Correct!';
+                feedbackEl.className = 'text-xs font-semibold text-center h-4 text-green-600';
+                cardEl.classList.add('correct');
+                // MODIFIED: Call to update graph on correct answer
+                updateGraphOnCorrectAnswer(index);
+            } else {
+                scenario.isCorrect = false;
+                feedbackEl.textContent = scenario.attempts === 1 ? 'Incorrect, try again.' : 'Incorrect.';
+                feedbackEl.className = 'text-xs font-semibold text-center h-4 text-red-600';
+                cardEl.classList.add('incorrect');
+                if (scenario.attempts >= 2) scenario.isLocked = true;
+            }
+
+            if (scenario.isLocked) {
+                inputEl.disabled = true;
+                document.getElementById(`scenario-btn-${index}`).disabled = true;
+                document.getElementById(`scenario-btn-${index}`).classList.add('bg-gray-400', 'cursor-not-allowed');
+            }
+        }
+
+
+        // --- Graphing Functions ---
+        function calculateMonthlyBalance(pv, pmt, i, k) {
+            if (i === 0) return pv + (pmt * k);
+            return pv * Math.pow(1 + i, k) + pmt * ((Math.pow(1 + i, k) - 1) / i);
+        }
+        
+        function getDatasetForScenario(scenarioIndex) {
+            const colors = ['#4F46E5', '#16A34A', '#DB2777', '#D97706', '#0891B2', '#6D28D9', '#BE185D', '#047857', '#9333EA', '#CA8A04'];
+            const scenario = state.scenarios[scenarioIndex];
+            const balanceData = [];
+            const monthlyRate = state.annualRate / 100 / 12;
+            const termInMonths = scenario.term * 12;
+
+            // MODIFIED: Run loop to 400 for x-axis
+            for (let k = 0; k <= 400; k++) {
+                if (k > termInMonths) balanceData.push(NaN);
+                else balanceData.push(calculateMonthlyBalance(state.loanAmount, scenario.correctAnswer, monthlyRate, k));
+            }
+            
+            return { 
+                label: `${scenario.term}-Yr ${scenario.type}`, 
+                data: balanceData, 
+                borderColor: colors[scenarioIndex % colors.length], 
+                borderWidth: 2, 
+                pointRadius: 0, 
+                fill: false, 
+                tension: 0.1, 
+                payment: scenario.correctAnswer 
+            };
+        }
+
+        function updateGraphOnCorrectAnswer(scenarioIndex) {
+            if (!amortizationChart) {
+                // First correct answer: create the chart
+                const datasets = [];
+                // Add property value line first
+                datasets.push({ label: 'Property Value', data: Array(401).fill(state.propertyValue), borderColor: '#4B5563', borderWidth: 2, borderDash: [5, 5], pointRadius: 0, fill: false });
+                // Add the correctly answered scenario line
+                datasets.push(getDatasetForScenario(scenarioIndex));
+
+                let maxBalloon = 0;
+                state.scenarios.forEach(s => { if(s.fv > maxBalloon) maxBalloon = s.fv; });
+                const maxY = Math.max(state.propertyValue, maxBalloon) * 1.1;
+                const labels = Array.from({length: 401}, (_, i) => i);
+
+                amortizationChart = new Chart(chartCanvas, {
+                    type: 'line',
+                    data: { labels, datasets },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { position: 'top' }, title: { display: true, text: 'Loan Balance Over Time' } },
+                        scales: { 
+                            x: { title: { display: true, text: 'Months' }, max: 400 }, // Set max for x-axis
+                            y: { title: { display: true, text: 'Outstanding Balance ($)' }, min: 0, max: maxY, ticks: { callback: value => '$' + value.toLocaleString() } } 
+                        }
+                    },
+                    plugins: [{
+                        id: 'line-end-labels',
+                        afterDraw: chart => {
+                            const ctx = chart.ctx;
+                            chart.data.datasets.forEach((dataset, i) => {
+                                const meta = chart.getDatasetMeta(i);
+                                if (meta.hidden || !dataset.payment) return;
+                                
+                                let lastIndex = dataset.data.length - 1;
+                                while(isNaN(dataset.data[lastIndex]) && lastIndex > 0) lastIndex--;
+                                if (lastIndex <= 0) return;
+
+                                const lastPoint = meta.data[lastIndex];
+                                ctx.font = '11px Inter';
+                                ctx.fillStyle = dataset.borderColor;
+                                ctx.textAlign = 'left';
+                                ctx.textBaseline = 'middle';
+                                const pmtText = `$${Math.abs(dataset.payment).toFixed(2)}`;
+                                ctx.fillText(pmtText, lastPoint.x + 5, lastPoint.y);
+                            });
+                        }
+                    }]
+                });
+
+            } else {
+                // Chart already exists, just add the new line
+                amortizationChart.data.datasets.push(getDatasetForScenario(scenarioIndex));
+                amortizationChart.update();
+            }
+        }
+
+        // --- Event Listeners ---
+        checkAnswerBtn.addEventListener('click', checkAnswer);
+        newProblemBtn.addEventListener('click', generateNewProblem);
+        toggleScenariosBtn.addEventListener('click', toggleAllScenariosView);
+        studentAnswerEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkAnswer(); });
+        window.onload = () => { generateNewProblem(); };
+    </script>
+</body>
+</html>
