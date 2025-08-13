@@ -54,12 +54,10 @@
                 <p class="text-gray-600 mt-2">Practice your financial calculation skills!</p>
             </header>
             
+            <!-- NEW: Codeword Input -->
             <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <label for="codeword" class="block text-lg font-medium text-blue-800">Enter Your Class Codeword:</label>
-                <div class="mt-1 flex items-center gap-4">
-                    <input type="text" id="codeword" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Codeword must be validated to log attempts">
-                    <span id="codeword-feedback" class="text-sm font-semibold h-5"></span>
-                </div>
+                <label for="codeword" class="block text-lg font-medium text-blue-800">Enter Your Class Codeword exactly as entered in Canvas (DO NOT ENTER YOUR NAME):</label>
+                <input type="text" id="codeword" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="e.g., Jane Doe">
             </div>
 
             <div id="problem-container" class="space-y-6">
@@ -124,7 +122,6 @@
 
             <div id="feedback-container" class="mt-6 p-4 rounded-md text-center hidden">
                 <p id="feedback-text" class="text-xl font-bold"></p>
-                <p id="correct-count-text" class="text-md mt-2 font-semibold text-blue-700"></p>
                 <div id="hint-text" class="text-md mt-2"></div>
             </div>
 
@@ -140,11 +137,12 @@
     </div>
 
     <script>
-        const SCRIPT_URL = "PASTE_YOUR_WEB_APP_URL_HERE"; 
+        // --- IMPORTANT: PASTE YOUR GOOGLE APPS SCRIPT URL HERE ---
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxT-IYxlEKrlkFro69LAcKiGl_Q2aBPNF0ucpj2YzFGCFLcHecLwGIXRrSQNS4EjMA/exec"; 
+        // ---------------------------------------------------------
 
+        // --- DOM Element References ---
         const codewordEl = document.getElementById('codeword');
-        const codewordFeedbackEl = document.getElementById('codeword-feedback');
-        const correctCountTextEl = document.getElementById('correct-count-text');
         const propertyValueEl = document.getElementById('property-value');
         const ltvRatioEl = document.getElementById('ltv-ratio');
         const interestRateEl = document.getElementById('interest-rate');
@@ -167,69 +165,22 @@
 
         let state = {
             propertyValue: 0, ltv: 0, annualRate: 0, loanAmount: 0, isAllScenariosView: false,
-            codewordIsValid: false, correctAnswerCount: 0,
             singleProblem: { amortizationType: '', termYears: 0, correctAnswer: 0, problemFv: 0, fvFactor: 0, attempts: 0, attempt1: null, attempt2: null },
             scenarios: [], partialFvFactor: 0, negativeFvFactor: 0,
         };
 
-        // --- Backend Communication ---
+        // --- Backend Logging ---
         function logAttemptToSheet(data) {
-            if (!SCRIPT_URL || SCRIPT_URL === "PASTE_YOUR_WEB_APP_URL_HERE") { console.warn("SCRIPT_URL not set."); return; }
-            const body = { action: 'logAttempt', payload: data };
-            
-            // CORRECTED: Send data as a URL-encoded parameter in the body
-            const urlEncodedData = new URLSearchParams({ data: JSON.stringify(body) });
-            
+            if (!SCRIPT_URL || SCRIPT_URL === "PASTE_YOUR_WEB_APP_URL_HERE") {
+                console.warn("SCRIPT_URL not set. Data will not be logged.");
+                return;
+            }
             fetch(SCRIPT_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: urlEncodedData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if(data.result !== 'success') console.error('Logging Error:', data.message);
-            })
-            .catch(err => console.error("Error logging data:", err));
-        }
-
-        async function validateCodewordAndGetCount() {
-            const codeword = codewordEl.value.trim();
-            if (!codeword) { codewordFeedbackEl.textContent = ''; state.codewordIsValid = false; return; }
-            if (!SCRIPT_URL || SCRIPT_URL === "PASTE_YOUR_WEB_APP_URL_HERE") return;
-
-            codewordFeedbackEl.textContent = 'Validating...';
-            codewordFeedbackEl.className = 'text-sm font-semibold h-5 text-gray-500';
-
-            try {
-                const body = { action: 'validateAndGetCount', codeword: codeword };
-                // CORRECTED: Send data as a URL-encoded parameter in the body
-                const urlEncodedData = new URLSearchParams({ data: JSON.stringify(body) });
-                
-                const response = await fetch(SCRIPT_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: urlEncodedData
-                });
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const data = await response.json();
-
-                if (data.result === 'success') {
-                    state.codewordIsValid = data.isValid;
-                    if (data.isValid) {
-                        codewordFeedbackEl.textContent = '✓ Valid';
-                        codewordFeedbackEl.className = 'text-sm font-semibold h-5 text-green-600';
-                        state.correctAnswerCount = data.correctCount;
-                    } else {
-                        codewordFeedbackEl.textContent = '✗ Invalid';
-                        codewordFeedbackEl.className = 'text-sm font-semibold h-5 text-red-600';
-                        state.correctAnswerCount = 0;
-                    }
-                } else { throw new Error(data.message); }
-            } catch (error) {
-                console.error("Validation error:", error);
-                codewordFeedbackEl.textContent = 'Error';
-                state.codewordIsValid = false;
-            }
+                mode: 'no-cors', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            }).catch(err => console.error("Error logging data:", err));
         }
 
         async function fetchInterestRate() {
@@ -305,22 +256,19 @@
             const isCorrect = difference <= 2.00;
 
             if (isCorrect) {
-                state.correctAnswerCount++;
-                showFeedback("Correct!", "success"); 
-                correctCountTextEl.textContent = `You have ${state.correctAnswerCount} correct answer(s) logged.`;
-                hintText.innerHTML = ''; lockProblem(); playKakapoAnimation();
+                showFeedback("Correct!", "success"); hintText.innerHTML = ''; lockProblem(); playKakapoAnimation();
             } else {
                 if (state.singleProblem.attempts === 1) { showFeedback("Incorrect. Try again!", "error"); provideHint(); } 
                 else { showFeedback("Incorrect. Please review the calculator inputs below.", "error"); discloseInputsOnFailure(); lockProblem(); }
             }
             
-            if ((isCorrect || state.singleProblem.attempts >= 2) && state.codewordIsValid) {
+            if (isCorrect || state.singleProblem.attempts >= 2) {
                 logAttemptToSheet({
                     codeword: codewordEl.value, problemType: `${state.singleProblem.termYears}-Yr ${state.singleProblem.amortizationType}`,
                     term: state.singleProblem.termYears * 12, loanAmount: state.loanAmount, interestRate: state.annualRate,
                     fv: state.singleProblem.amortizationType === 'Interest Only' ? -state.loanAmount : -state.singleProblem.problemFv,
                     attempt1: state.singleProblem.attempt1, attempt2: state.singleProblem.attempt2, wasCorrect: isCorrect,
-                    correctAnswer: state.singleProblem.correctAnswer
+                    correctAnswer: state.singleProblem.correctAnswer // <-- ADDED
                 });
             }
         }
@@ -354,9 +302,7 @@
         function resetUIForNewProblem() {
             state.singleProblem.attempts = 0; studentAnswerEl.value = ''; studentAnswerEl.disabled = false;
             checkAnswerBtn.disabled = false; checkAnswerBtn.classList.remove('bg-gray-400', 'cursor-not-allowed'); checkAnswerBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
-            newProblemBtn.classList.add('hidden'); feedbackContainer.classList.add('hidden'); hintText.innerHTML = ''; correctCountTextEl.innerHTML = ''; codewordEl.disabled = false;
-            state.codewordIsValid = false;
-            codewordFeedbackEl.textContent = '';
+            newProblemBtn.classList.add('hidden'); feedbackContainer.classList.add('hidden'); hintText.innerHTML = ''; codewordEl.disabled = false;
             if (amortizationChart) { amortizationChart.destroy(); amortizationChart = null; }
         }
 
@@ -369,7 +315,7 @@
         function showFeedback(message, type) {
             feedbackText.textContent = message; feedbackContainer.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700');
             if (type === 'success') feedbackContainer.classList.add('bg-green-100', 'text-green-700');
-            else { feedbackContainer.classList.add('bg-red-100', 'text-red-700'); correctCountTextEl.textContent = ''; }
+            else feedbackContainer.classList.add('bg-red-100', 'text-red-700');
         }
         
         function playKakapoAnimation() { kakapoContainer.style.display = 'flex'; setTimeout(() => { kakapoContainer.style.display = 'none'; }, 4000); }
@@ -427,7 +373,7 @@
                 feedbackEl.className = 'text-xs font-semibold text-center h-4 text-red-600'; cardEl.classList.add('incorrect');
             }
 
-            if ((isCorrect || scenario.attempts >= 2) && state.codewordIsValid) {
+            if (isCorrect || scenario.attempts >= 2) {
                 scenario.isLocked = true;
                 inputEl.disabled = true; document.getElementById(`scenario-btn-${index}`).disabled = true; document.getElementById(`scenario-btn-${index}`).classList.add('bg-gray-400', 'cursor-not-allowed');
                 logAttemptToSheet({
@@ -435,7 +381,7 @@
                     term: scenario.term * 12, loanAmount: state.loanAmount, interestRate: state.annualRate,
                     fv: scenario.type === 'Interest Only' ? -state.loanAmount : -scenario.fv,
                     attempt1: scenario.attempt1, attempt2: scenario.attempt2, wasCorrect: isCorrect,
-                    correctAnswer: scenario.correctAnswer
+                    correctAnswer: scenario.correctAnswer // <-- ADDED
                 });
             }
         }
@@ -465,11 +411,9 @@
             } else { amortizationChart.data.datasets.push(getDatasetForScenario(scenarioIndex)); amortizationChart.update(); }
         }
 
-        // --- Event Listeners ---
         checkAnswerBtn.addEventListener('click', checkAnswer);
         newProblemBtn.addEventListener('click', generateNewProblem);
         toggleScenariosBtn.addEventListener('click', toggleAllScenariosView);
-        codewordEl.addEventListener('blur', validateCodewordAndGetCount);
         studentAnswerEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkAnswer(); });
         window.onload = () => { generateNewProblem(); };
     </script>
