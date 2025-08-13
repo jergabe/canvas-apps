@@ -140,7 +140,7 @@
     </div>
 
     <script>
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxT-IYxlEKrlkFro69LAcKiGl_Q2aBPNF0ucpj2YzFGCFLcHecLwGIXRrSQNS4EjMA/exec"; 
+        const SCRIPT_URL = "PASTE_YOUR_WEB_APP_URL_HERE"; 
 
         const codewordEl = document.getElementById('codeword');
         const codewordFeedbackEl = document.getElementById('codeword-feedback');
@@ -176,22 +176,20 @@
         function logAttemptToSheet(data) {
             if (!SCRIPT_URL || SCRIPT_URL === "PASTE_YOUR_WEB_APP_URL_HERE") { console.warn("SCRIPT_URL not set."); return; }
             const body = { action: 'logAttempt', payload: data };
+            
+            // CORRECTED: Send data as a URL-encoded parameter in the body
+            const urlEncodedData = new URLSearchParams({ data: JSON.stringify(body) });
+            
             fetch(SCRIPT_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: urlEncodedData
             })
             .then(response => response.json())
             .then(data => {
-                if(data.result !== 'success') {
-                    console.error('Logging Error:', data.message);
-                }
+                if(data.result !== 'success') console.error('Logging Error:', data.message);
             })
-            .catch(err => {
-                // NEW: Enhanced error logging
-                console.error("A detailed error occurred while logging data. See details below:");
-                console.error(err);
-            });
+            .catch(err => console.error("Error logging data:", err));
         }
 
         async function validateCodewordAndGetCount() {
@@ -204,10 +202,13 @@
 
             try {
                 const body = { action: 'validateAndGetCount', codeword: codeword };
+                // CORRECTED: Send data as a URL-encoded parameter in the body
+                const urlEncodedData = new URLSearchParams({ data: JSON.stringify(body) });
+                
                 const response = await fetch(SCRIPT_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: urlEncodedData
                 });
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
@@ -225,11 +226,8 @@
                     }
                 } else { throw new Error(data.message); }
             } catch (error) {
-                // NEW: Enhanced error logging
-                console.error("A detailed validation error occurred. See details below:");
-                console.error(error);
-                codewordFeedbackEl.textContent = 'Network Error';
-                codewordFeedbackEl.className = 'text-sm font-semibold h-5 text-red-600';
+                console.error("Validation error:", error);
+                codewordFeedbackEl.textContent = 'Error';
                 state.codewordIsValid = false;
             }
         }
@@ -477,4 +475,3 @@
     </script>
 </body>
 </html>
-
