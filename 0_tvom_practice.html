@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale-1.0">
+    <title>Time Value of Money Practice</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .question-card {
+            transition: transform 0.3s ease-in-out;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 600px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19);
+            animation-name: animatetop;
+            animation-duration: 0.4s
+        }
+        @keyframes animatetop {
+            from {top: -300px; opacity: 0}
+            to {top: 0; opacity: 1}
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .btn {
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .summary-table th, .summary-table td {
+            padding: 12px;
+            border: 1px solid #ddd;
+        }
+        .question-table td {
+             padding: 4px 8px 4px 0;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800">Time Value of Money Practice</h1>
+            <p class="text-lg text-gray-600 mt-2">Test your TVM skills with randomized problems.</p>
+        </header>
+
+        <div id="quiz-container" class="max-w-4xl mx-auto">
+            <!-- Questions will be injected here -->
+        </div>
+
+        <div id="navigation-container" class="max-w-4xl mx-auto mt-6 flex justify-between items-center">
+            <button id="prev-btn" class="btn bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg">Previous</button>
+            <span id="question-counter" class="font-semibold text-gray-700"></span>
+            <button id="next-btn" class="btn bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-lg">Next</button>
+        </div>
+        <div id="finish-container" class="max-w-4xl mx-auto mt-6 text-center hidden">
+             <button id="finish-btn" class="btn bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-lg text-lg">Finish Quiz & See Summary</button>
+        </div>
+
+
+        <div id="summary-container" class="hidden max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-lg mt-8">
+            <h2 class="text-3xl font-bold text-center mb-6">Quiz Summary</h2>
+            <p id="score" class="text-2xl font-semibold text-center mb-6"></p>
+            <table class="w-full text-left border-collapse summary-table mb-6">
+                <thead>
+                    <tr class="bg-gray-200">
+                        <th class="w-1/12">Q#</th>
+                        <th class="w-5/12">Your Answer</th>
+                        <th class="w-5/12">Correct Answer</th>
+                        <th class="w-1/12">Result</th>
+                    </tr>
+                </thead>
+                <tbody id="summary-table-body">
+                </tbody>
+            </table>
+            <div class="text-center">
+                <button id="download-summary-btn" class="btn bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg mr-4">Download Summary</button>
+                <button id="new-problems-btn" class="btn bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">New Set of Problems</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Modal for Walkthrough -->
+    <div id="walkthrough-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-modal-btn">&times;</span>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+    
+    <!-- Modal for Gifs -->
+    <div id="gif-modal" class="modal">
+        <div class="modal-content bg-transparent border-0 shadow-none text-center">
+             <img id="gif-image" src="" alt="Result GIF">
+        </div>
+    </div>
+
+
+    <script>
+        // --- UTILITY FUNCTIONS ---
+        const $ = (selector) => document.querySelector(selector);
+        const $$ = (selector) => document.querySelectorAll(selector);
+
+        function generateRandom(min, max) { return Math.random() * (max - min) + min; }
+        function generateInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+        function roundToQuarterPercent(rate) { return Math.round(rate * 4) / 4; }
+        function formatCurrency(num) { return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num); }
+
+        function npv(rate, cashFlows) {
+            let total = 0;
+            for (let i = 0; i < cashFlows.length; i++) {
+                total += cashFlows[i] / Math.pow(1 + rate, i);
+            }
+            return total;
+        }
+
+        function irr(cashFlows, guess = 0.1, maxIterations = 50, tolerance = 1e-7) {
+            let x0 = guess;
+            let x1 = guess + 0.01;
+            for (let i = 0; i < maxIterations; i++) {
+                const f0 = npv(x0, cashFlows);
+                const f1 = npv(x1, cashFlows);
+                if (Math.abs(f1) < tolerance) return x1 * 100;
+                if (f1 === f0) return null;
+                const x2 = x1 - f1 * (x1 - x0) / (f1 - f0);
+                x0 = x1;
+                x1 = x2;
+            }
+            return null;
+        }
+
+        // --- GLOBAL STATE ---
+        let questions = [];
+        let userAnswers = [];
+        let currentQuestionIndex = 0;
+
+        // --- PROBLEM GENERATION ---
+        function generateProblems() {
+            questions = [];
+            userAnswers = Array.from({ length: 12 }, () => ({
+                attempts: 0,
+                answer: null,
+                correct: false
+            }));
+            
+            // Q1
+            const q1_pv = generateInt(100, 500);
+            const q1_i = roundToQuarterPercent(generateRandom(3, 8));
+            const q1_n = generateInt(20, 40);
+            const q1_fv = q1_pv * Math.pow(1 + q1_i / 100, q1_n);
+            questions.push({
+                id: '1',
+                text: `Calculate the future value of ${formatCurrency(q1_pv)} invested at ${q1_i}% for ${q1_n} years.`,
+                answer: q1_fv,
+                inputs: { pv: q1_pv, i: q1_i, n: q1_n, pmt: 0 },
+                solveFor: 'FV'
+            });
+
+            // Q2
+            const q2_fv = generateInt(20000, 50000);
+            const q2_n = generateInt(5, 15);
+            const q2_i = roundToQuarterPercent(generateRandom(4, 9));
+            const q2_pv = q2_fv / Math.pow(1 + q2_i / 100, q2_n);
+            questions.push({
+                id: '2',
+                text: `What is the present value of ${formatCurrency(q2_fv)} to be received in ${q2_n} years if the interest rate is ${q2_i}%?`,
+                answer: q2_pv,
+                inputs: { fv: q2_fv, n: q2_n, i: q2_i, pmt: 0 },
+                solveFor: 'PV'
+            });
+
+            // Q3a & 3b
+            const q3_pv = generateInt(500000, 800000);
+            const q3_i_future = roundToQuarterPercent(generateRandom(5, 10));
+            const q3_n_future = generateInt(5, 10);
+            const q3a_fv = q3_pv * Math.pow(1 + q3_i_future / 100, q3_n_future);
+            questions.push({
+                id: '3a',
+                text: `The value of a house today is ${formatCurrency(q3_pv)}, and it is expected to increase ${q3_i_future}% per year. What will be its value in ${q3_n_future} years?`,
+                answer: q3a_fv,
+                inputs: { pv: q3_pv, i: q3_i_future, n: q3_n_future, pmt: 0 },
+                solveFor: 'FV'
+            });
+
+            const q3_i_past = roundToQuarterPercent(generateRandom(10, 20));
+            const q3_n_past = generateInt(3, 6);
+            const q3b_pv = q3_pv / Math.pow(1 + q3_i_past / 100, q3_n_past);
+            questions.push({
+                id: '3b',
+                text: `If the value of the same house (${formatCurrency(q3_pv)}) has increased at ${q3_i_past}% per year over the last ${q3_n_past} years, what was its value ${q3_n_past} years ago?`,
+                answer: q3b_pv,
+                inputs: { fv: q3_pv, i: q3_i_past, n: q3_n_past, pmt: 0 },
+                solveFor: 'PV'
+            });
+            
+            // Q4a & 4b
+            const q4_pmt_annual = generateInt(4000, 6000);
+            const q4_n = generateInt(25, 35);
+            const q4_i = roundToQuarterPercent(generateRandom(8, 12));
+            const q4a_fv = q4_pmt_annual * ((Math.pow(1 + q4_i/100, q4_n) - 1) / (q4_i/100));
+            questions.push({
+                id: '4a',
+                text: `Ms. Johnson plans to save ${formatCurrency(q4_pmt_annual)} at the end of each year for ${q4_n} years. If the annual rate of return is ${q4_i}%, how much will she have in ${q4_n} years?`,
+                answer: q4a_fv,
+                inputs: { pmt: q4_pmt_annual, n: q4_n, i: q4_i, pv: 0 },
+                solveFor: 'FV'
+            });
+
+            const q4_pmt_monthly = q4_pmt_annual / 12;
+            const q4b_n_months = q4_n * 12;
+            const q4b_i_monthly = q4_i / 100 / 12;
+            const q4b_fv = q4_pmt_monthly * ((Math.pow(1 + q4b_i_monthly, q4b_n_months) - 1) / q4b_i_monthly);
+             questions.push({
+                id: '4b',
+                text: `If she saves ${formatCurrency(q4_pmt_monthly)} each month instead, how much will she have in ${q4_n} years at the same ${q4_i}% annual rate?`,
+                answer: q4b_fv,
+                inputs: { pmt: q4_pmt_monthly, n: q4b_n_months, i: q4_i, pv: 0 },
+                solveFor: 'FV (monthly)'
+            });
+
+            // Q5a & 5b
+            const q5_pv = generateInt(100000, 200000);
+            const q5_i = roundToQuarterPercent(generateRandom(5, 8));
+            const q5_n = generateInt(10, 20);
+            const q5a_pmt = q5_pv * ( (q5_i/100) / (1 - Math.pow(1 + q5_i/100, -q5_n)) );
+            questions.push({
+                id: '5a',
+                text: `A company borrows a ${formatCurrency(q5_pv)} loan at a ${q5_i}% interest rate. The loan will be paid off over ${q5_n} years with annual payments. How much is each payment?`,
+                answer: q5a_pmt,
+                inputs: { pv: q5_pv, i: q5_i, n: q5_n, fv: 0 },
+                solveFor: 'PMT'
+            });
+
+            const q5b_n_months = q5_n * 12;
+            const q5b_i_monthly = q5_i / 100 / 12;
+            const q5b_pmt = q5_pv * ( q5b_i_monthly / (1 - Math.pow(1 + q5b_i_monthly, -q5b_n_months)) );
+            questions.push({
+                id: '5b',
+                text: `If the same loan (${formatCurrency(q5_pv)} at ${q5_i}% for ${q5_n} years) calls for monthly payments, how much is each payment?`,
+                answer: q5b_pmt,
+                inputs: { pv: q5_pv, i: q5_i, n: q5b_n_months, fv: 0 },
+                solveFor: 'PMT (monthly)'
+            });
+            
+            // Q6 (Solving for I/Y)
+            const q6_pv = generateInt(1000, 2000);
+            const q6_n = generateInt(40, 50);
+            const q6_i_annual_target = roundToQuarterPercent(generateRandom(8, 15));
+            const q6_i_monthly = q6_i_annual_target / 100 / 12;
+            const q6_pmt_calculated = q6_pv * ( q6_i_monthly / (1 - Math.pow(1 + q6_i_monthly, -q6_n)) );
+            questions.push({
+                id: '6',
+                text: `You want to buy a new computer that sells for ${formatCurrency(q6_pv)}. The manufacturer offers a plan with monthly payments of ${formatCurrency(q6_pmt_calculated)} for ${q6_n} months. What is the annual interest rate? (Answer in percent, e.g., 12.34%)`,
+                answer: q6_i_annual_target,
+                inputs: { pv: q6_pv, pmt: -q6_pmt_calculated, n: q6_n, fv: 0 },
+                solveFor: 'I/Y (annual)'
+            });
+
+            // Q7 (NPV)
+            const q7_outlay = generateInt(40000, 60000);
+            const q7_cfs = [generateInt(10000, 15000), generateInt(15000, 20000), generateInt(20000, 25000), generateInt(25000, 30000), generateInt(30000, 35000)];
+            const q7_rrr = roundToQuarterPercent(generateRandom(10, 15));
+            let q7_npv = -q7_outlay;
+            q7_cfs.forEach((cf, i) => {
+                q7_npv += cf / Math.pow(1 + q7_rrr/100, i + 1);
+            });
+            questions.push({
+                id: '7',
+                text: `What is the net present value of a project with a ${q7_rrr}% required rate of return and the following cash flows?
+                <table class="w-full sm:w-1/2 text-left my-4 border-collapse question-table">
+                    <tr class="border-b"><td class="font-medium">Year 0 (Initial Outlay)</td><td>${formatCurrency(-q7_outlay)}</td></tr>
+                    <tr class="border-b"><td>Year 1</td><td>${formatCurrency(q7_cfs[0])}</td></tr>
+                    <tr class="border-b"><td>Year 2</td><td>${formatCurrency(q7_cfs[1])}</td></tr>
+                    <tr class="border-b"><td>Year 3</td><td>${formatCurrency(q7_cfs[2])}</td></tr>
+                    <tr class="border-b"><td>Year 4</td><td>${formatCurrency(q7_cfs[3])}</td></tr>
+                    <tr><td>Year 5</td><td>${formatCurrency(q7_cfs[4])}</td></tr>
+                </table>`,
+                answer: q7_npv,
+                inputs: { outlay: q7_outlay, cfs: q7_cfs, rrr: q7_rrr },
+                solveFor: 'NPV'
+            });
+
+            // Q8a & 8b
+            const q8_investment = generateInt(4000, 5000);
+            const q8_pmt1 = generateInt(400, 600);
+            const q8_n1 = 4;
+            const q8_pmt2 = generateInt(700, 900);
+            const q8_n2 = 6;
+            const q8a_cashflows = [-q8_investment, ...Array(q8_n1).fill(q8_pmt1), ...Array(q8_n2).fill(q8_pmt2)];
+            const q8a_irr = irr(q8a_cashflows);
+            questions.push({
+                id: '8a',
+                text: `Your advisor offers an investment: pay ${formatCurrency(q8_investment)} now and receive ${formatCurrency(q8_pmt1)} at the end of each of the next ${q8_n1} years, and ${formatCurrency(q8_pmt2)} at the end of the following ${q8_n2} years. What is the annual rate of return (IRR)? (Answer in percent, e.g., 9.87%)`,
+                answer: q8a_irr,
+                inputs: { outlay: q8_investment, pmt1: q8_pmt1, n1: q8_n1, pmt2: q8_pmt2, n2: q8_n2},
+                solveFor: 'IRR'
+            });
+            
+            const q8_rrr = roundToQuarterPercent(generateRandom(8, 12));
+            let q8b_npv = 0;
+            for(let i = 1; i <= q8_n1; i++) { q8b_npv += q8_pmt1 / Math.pow(1 + q8_rrr/100, i); }
+            for(let i = 1; i <= q8_n2; i++) { q8b_npv += q8_pmt2 / Math.pow(1 + q8_rrr/100, q8_n1 + i); }
+            questions.push({
+                id: '8b',
+                text: `Given the cash flows from the previous question (${formatCurrency(q8_pmt1)} for ${q8_n1} years, then ${formatCurrency(q8_pmt2)} for ${q8_n2} years), and a minimum acceptable return of ${q8_rrr}%, how much should you pay for this investment today (i.e., what is its Present Value)?`,
+                answer: q8b_npv,
+                inputs: { pmt1: q8_pmt1, n1: q8_n1, pmt2: q8_pmt2, n2: q8_n2, rrr: q8_rrr },
+                solveFor: 'PV of uneven cash flows'
+            });
+        }
+        
+        // --- UI RENDERING & NAVIGATION ---
+        function renderQuestions() {
+            const container = $('#quiz-container');
+            container.innerHTML = '';
+            questions.forEach((q, index) => {
+                const card = document.createElement('div');
+                card.className = `question-card bg-white p-6 rounded-lg shadow-md mb-6 hidden`;
+                card.id = `question-${index}`;
+                card.innerHTML = `
+                    <p class="text-lg font-semibold mb-1">Question ${q.id}</p>
+                    <div class="text-gray-700 mb-4">${q.text}</div>
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center">
+                        <input type="number" step="any" id="answer-${index}" class="border-2 border-gray-300 rounded-lg p-2 mb-4 sm:mb-0 sm:mr-4 w-full sm:w-auto flex-grow" placeholder="Enter your answer">
+                        <button data-index="${index}" class="submit-btn btn bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg w-full sm:w-auto">Submit</button>
+                    </div>
+                    <p id="hint-${index}" class="text-orange-500 mt-2 font-medium"></p>
+                    <div id="feedback-${index}" class="mt-4"></div>
+                `;
+                container.appendChild(card);
+            });
+            
+            $$('.submit-btn').forEach(btn => btn.addEventListener('click', handleSubmit));
+            showQuestion(0);
+        }
+
+        function showQuestion(index) {
+            $$('.question-card').forEach((card, i) => {
+                card.classList.toggle('hidden', i !== index);
+            });
+            currentQuestionIndex = index;
+            updateNavigation();
+        }
+
+        function updateNavigation() {
+            $('#prev-btn').disabled = currentQuestionIndex === 0;
+            $('#question-counter').textContent = `Question ${currentQuestionIndex + 1} of ${questions.length}`;
+
+            if (currentQuestionIndex === questions.length - 1) {
+                // On the last question, hide 'Next' and show the 'Finish' button
+                $('#next-btn').classList.add('hidden');
+                $('#finish-container').classList.remove('hidden');
+            } else {
+                // On all other questions, show 'Next' and hide the 'Finish' button
+                $('#next-btn').classList.remove('hidden');
+                $('#finish-container').classList.add('hidden');
+            }
+        }
+
+        function navigate(direction) {
+            const newIndex = currentQuestionIndex + direction;
+            if (newIndex >= 0 && newIndex < questions.length) {
+                showQuestion(newIndex);
+            }
+        }
+
+        // --- EVENT HANDLERS & LOGIC ---
+        function handleSubmit(event) {
+            const index = parseInt(event.target.dataset.index);
+            const answerInput = $(`#answer-${index}`);
+            const userAnswer = parseFloat(answerInput.value);
+            
+            if (isNaN(userAnswer)) {
+                $(`#hint-${index}`).textContent = 'Please enter a valid number.';
+                return;
+            }
+
+            const currentQ = questions[index];
+            const currentA = userAnswers[index];
+            
+            let isCorrect = false;
+            if (currentQ.solveFor.includes('I/Y') || currentQ.solveFor.includes('IRR')) {
+                isCorrect = Math.abs(userAnswer - currentQ.answer) < 0.01;
+            } else {
+                isCorrect = Math.abs(userAnswer - currentQ.answer) < 1.0;
+            }
+
+            currentA.attempts += 1;
+            currentA.answer = userAnswer;
+            const feedbackContainer = $(`#feedback-${index}`);
+
+            if (isCorrect) {
+                currentA.correct = true;
+                showGif("https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExZGpzNmUyNjh1ZWN2eDFtY3p1amZ6N2dnMXQxajJrNGh5dzZreTBieiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/6yQq08riFOmeYkW3Xg/giphy.gif");
+                feedbackContainer.innerHTML = `<p class="text-green-600 font-bold">Correct!</p>`;
+                disableQuestion(index);
+            } else {
+                if (currentA.attempts === 1) {
+                    const hint = getHint(currentQ);
+                    $(`#hint-${index}`).textContent = `Hint: ${hint}`;
+                    answerInput.value = '';
+                    answerInput.focus();
+                } else {
+                    currentA.correct = false;
+                    showGif("https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExdWdjbDYwdXE5d2lmcHJ3OHo4eDJ5aDJuYWFxNGp0MnJmeWYycTdudSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/hKQeYeYiH6O8Mvygh2/giphy.gif");
+                    
+                    let correctAnswerFormatted = (currentQ.solveFor.includes('I/Y') || currentQ.solveFor.includes('IRR')) 
+                        ? `${currentQ.answer.toFixed(2)}%` 
+                        : formatCurrency(currentQ.answer);
+
+                    feedbackContainer.innerHTML = `<p class="text-red-600 font-bold">Incorrect. The correct answer is ${correctAnswerFormatted}.</p>`;
+                    
+                    const walkthroughBtn = document.createElement('button');
+                    walkthroughBtn.textContent = 'Show Walkthrough';
+                    walkthroughBtn.className = 'btn bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg mt-2';
+                    walkthroughBtn.onclick = () => showWalkthrough(currentQ);
+                    feedbackContainer.appendChild(walkthroughBtn);
+                    disableQuestion(index);
+                }
+            }
+        }
+
+        function getHint(question) {
+            if (question.solveFor.includes('I/Y')) {
+                const { pv, pmt, n, fv } = question.inputs;
+                return `Assuming 1 P/YR on your calculator, try these inputs: N=${n}, PV=${pv}, PMT=${pmt}, FV=${fv}. Then solve for I/YR and multiply by 12.`;
+            }
+
+            const keys = Object.keys(question.inputs).filter(k => !Array.isArray(question.inputs[k]));
+            const randomKey = keys[Math.floor(Math.random() * keys.length)];
+            let value = question.inputs[randomKey];
+
+            if (typeof value === 'number' && !['n', 'n1', 'n2', 'rrr', 'i'].includes(randomKey)) {
+                 value = formatCurrency(value);
+            }
+            if(randomKey === 'i' || randomKey === 'rrr') value = `${value}%`;
+
+            let keyName = randomKey.toUpperCase();
+            if(keyName === 'I') keyName = 'I/Y';
+            if(keyName === 'RRR') keyName = 'Required Rate';
+
+            return `One of the correct inputs is ${keyName}: ${value}`;
+        }
+        
+        function disableQuestion(index) {
+            $(`#answer-${index}`).disabled = true;
+            $(`#question-${index} .submit-btn`).disabled = true;
+            $(`#question-${index} .submit-btn`).classList.add('opacity-50');
+        }
+
+        function showGif(url) {
+            const modal = $('#gif-modal');
+            $('#gif-image').src = url;
+            modal.style.display = 'flex';
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 2500);
+        }
+
+        function showWalkthrough(question) {
+            const modal = $('#walkthrough-modal');
+            const modalBody = $('#modal-body');
+            
+            let { pv=0, fv=0, pmt=0, i=0, n=0, outlay=0, cfs=[], rrr=0, pmt1=0, n1=0, pmt2=0, n2=0 } = question.inputs;
+            let walkthroughHTML = `<h3 class="text-2xl font-bold mb-4">Walkthrough for Question ${question.id}</h3>`;
+            
+            // Text Summary
+            walkthroughHTML += `<div class="mb-4">
+                <h4 class="text-xl font-semibold mb-2">Conceptual Summary</h4>`;
+            switch(question.solveFor) {
+                case 'FV': walkthroughHTML += `<p>This is a future value problem. We are given a present amount (PV), an interest rate (I/Y), and a number of periods (N), and we need to find its value at a future date (FV).</p>`; break;
+                case 'PV': walkthroughHTML += `<p>This is a present value problem. We are given a future amount (FV), an interest rate (I/Y), and a number of periods (N), and we need to find its value today (PV).</p>`; break;
+                case 'FV (monthly)': walkthroughHTML += `<p>This is a future value of an annuity problem with monthly compounding. The number of periods (N) must be in months, and the interest rate (I/Y) must be the monthly rate.</p>`; break;
+                case 'PMT': walkthroughHTML += `<p>This is a loan amortization problem. We are solving for the periodic payment (PMT) required to pay off a loan (PV) over a set number of periods (N) at a given interest rate (I/Y).</p>`; break;
+                case 'PMT (monthly)': walkthroughHTML += `<p>This is a loan amortization problem with monthly payments. The number of periods (N) must be in months, and the interest rate (I/Y) must be the monthly rate to calculate the correct monthly payment.</p>`; break;
+                case 'I/Y (annual)': walkthroughHTML += `<p>Here we solve for the interest rate (I/Y). Given the present value (PV), payment (PMT), and number of periods (N), we can find the periodic interest rate. We must then annualize it by multiplying by 12.</p>`; break;
+                case 'NPV': walkthroughHTML += `<p>Net Present Value (NPV) is the sum of the present values of all cash inflows and outflows. We discount each cash flow back to today using the required rate of return and sum them up. A positive NPV means the investment is earning an annual return greater than the interest rate used in the calculation. Negative NPV does NOT necessarily mean you are losing money, rather you are earning less than the interest rate specified.</p>`; break;
+                case 'IRR': walkthroughHTML += `<p>The Internal Rate of Return (IRR) is the discount rate that makes the Net Present Value (NPV) of all cash flows from a particular project equal to zero. It's a measure of the investment's profitability. This usually requires a financial calculator or software to solve.</p>`; break;
+                case 'PV of uneven cash flows': walkthroughHTML += `<p>To find the value of an investment with uneven cash flows, we must find the present value of each individual cash flow using the required rate of return and then sum them all up. This gives the total present value, or the maximum price you should be willing to pay.</p>`; break;
+            }
+            walkthroughHTML += `</div>`;
+
+            // HP 10bii Walkthrough
+            walkthroughHTML += `<div class="mb-4">
+                <h4 class="text-xl font-semibold mb-2">HP 10bii+ Calculator Inputs</h4>
+                <div class="grid grid-cols-2 gap-2 bg-gray-200 p-3 rounded-lg">`;
+            
+            if (question.solveFor.includes('monthly') || question.id === '6') {
+                 walkthroughHTML += `<p class="font-mono col-span-2">Set P/YR = 12</p>`;
+            } else if (question.solveFor !== 'NPV' && question.solveFor !== 'IRR' && question.solveFor !== 'PV of uneven cash flows') {
+                 walkthroughHTML += `<p class="font-mono col-span-2">Set P/YR = 1</p>`;
+            }
+
+            if (question.solveFor === 'NPV' || question.solveFor === 'IRR' || question.solveFor === 'PV of uneven cash flows') {
+                if(question.inputs.outlay) walkthroughHTML += `<p class="font-mono">${question.inputs.outlay}</p><p>[+/-] [CFj]</p>`;
+                if(question.inputs.cfs) question.inputs.cfs.forEach((cf, i) => walkthroughHTML += `<p class="font-mono">${cf}</p><p>[CFj]</p>`);
+                if(question.inputs.pmt1) walkthroughHTML += `<p class="font-mono">${question.inputs.pmt1}</p><p>[CFj]</p><p class="font-mono">${question.inputs.n1}</p><p>[SHIFT] [Nj]</p>`;
+                if(question.inputs.pmt2) walkthroughHTML += `<p class="font-mono">${question.inputs.pmt2}</p><p>[CFj]</p><p class="font-mono">${question.inputs.n2}</p><p>[SHIFT] [Nj]</p>`;
+                if(question.inputs.rrr) walkthroughHTML += `<p class="font-mono">${question.inputs.rrr}</p><p>[I/YR]</p>`;
+                let computeKey = 'NPV';
+                if (question.solveFor === 'IRR') computeKey = 'IRR/YR';
+                if (question.solveFor === 'PV of uneven cash flows') computeKey = 'NPV';
+                walkthroughHTML += `<p class="font-mono font-bold">Compute</p><p>[SHIFT] [${computeKey}]</p>`;
+            } else {
+                if(question.solveFor !== 'N') walkthroughHTML += `<p class="font-mono">N:</p><p>${n}</p>`;
+                if(question.solveFor !== 'I/Y (annual)' && question.solveFor !== 'I/Y') walkthroughHTML += `<p class="font-mono">I/YR:</p><p>${i}</p>`;
+                if(question.solveFor !== 'PV') walkthroughHTML += `<p class="font-mono">PV:</p><p>${pv}</p>`;
+                if(question.solveFor !== 'PMT' && question.solveFor !== 'PMT (monthly)') walkthroughHTML += `<p class="font-mono">PMT:</p><p>${pmt}</p>`;
+                if(question.solveFor !== 'FV' && question.solveFor !== 'FV (monthly)') walkthroughHTML += `<p class="font-mono">FV:</p><p>${fv}</p>`;
+                let solveKey = question.solveFor.replace(' (annual)','').replace(' (monthly)','');
+                if (solveKey === 'I/Y') solveKey = 'I/YR';
+                walkthroughHTML += `<p class="font-mono font-bold">Solve for:</p><p>[${solveKey}]</p>`;
+            }
+            walkthroughHTML += `</div></div>`;
+
+            // Excel Walkthrough
+            walkthroughHTML += `<div>
+                <h4 class="text-xl font-semibold mb-2">MS Excel / Google Sheets Formula</h4>`;
+            let excelFormula = '';
+            let excelRate = question.solveFor.includes('monthly') || question.id === '6' ? `${i}/12` : `${i}%`;
+            let excelNper = n;
+            let excelPmt = pmt;
+            let excelPv = pv;
+            if (excelPv > 0 && excelPmt >= 0) excelPv = -excelPv;
+            if (excelPmt > 0 && excelPv >= 0) excelPmt = -excelPmt;
+
+            switch(question.solveFor) {
+                case 'FV': excelFormula = `=FV(${excelRate}, ${excelNper}, ${excelPmt}, ${excelPv})`; break;
+                case 'PV': excelFormula = `=PV(${excelRate}, ${excelNper}, ${excelPmt}, ${fv})`; break;
+                case 'FV (monthly)': excelFormula = `=FV(${excelRate}, ${excelNper}, ${excelPmt}, ${excelPv})`; break;
+                case 'PMT': excelFormula = `=PMT(${excelRate}, ${excelNper}, ${pv}, ${fv})`; break;
+                case 'PMT (monthly)': excelFormula = `=PMT(${excelRate}, ${excelNper}, ${pv}, ${fv})`; break;
+                case 'I/Y (annual)': excelFormula = `=RATE(${excelNper}, ${pmt}, ${pv}, ${fv})*12`; break;
+                case 'NPV': excelFormula = `=NPV(${rrr}%, ${cfs.join(', ')}) - ${outlay}`; break;
+                case 'IRR': {
+                    const { outlay, pmt1, n1, pmt2, n2 } = question.inputs;
+                    const cashFlowsForFormula = [-outlay, ...Array(n1).fill(pmt1), ...Array(n2).fill(pmt2)];
+                    excelFormula = `=IRR({${cashFlowsForFormula.join(',')}})`;
+                    break;
+                }
+                case 'PV of uneven cash flows': {
+                    const { pmt1, n1, pmt2, n2, rrr } = question.inputs;
+                    const cashFlowsForFormula = [...Array(n1).fill(pmt1), ...Array(n2).fill(pmt2)];
+                    excelFormula = `=NPV(${rrr}%, ${cashFlowsForFormula.join(', ')})`;
+                    break;
+                }
+            }
+            walkthroughHTML += `<p class="bg-gray-800 text-white font-mono p-3 rounded-lg break-all">${excelFormula}</p></div>`;
+
+            modalBody.innerHTML = walkthroughHTML;
+            modal.style.display = 'flex';
+        }
+
+        function showSummary() {
+            // Mark all unanswered questions as incorrect
+            userAnswers.forEach(ua => {
+                if (ua.attempts === 0) {
+                    ua.correct = false;
+                }
+            });
+
+            $('#quiz-container').classList.add('hidden');
+            $('#navigation-container').classList.add('hidden');
+            $('#finish-container').classList.add('hidden');
+            const summaryContainer = $('#summary-container');
+            summaryContainer.classList.remove('hidden');
+
+            const correctCount = userAnswers.filter(a => a.correct).length;
+            $('#score').textContent = `Your Score: ${correctCount} / ${questions.length}`;
+            
+            const tableBody = $('#summary-table-body');
+            tableBody.innerHTML = '';
+            questions.forEach((q, i) => {
+                const userAnswer = userAnswers[i];
+                let userAnswerFormatted = 'No Answer';
+                if(userAnswer.answer !== null) {
+                    userAnswerFormatted = (q.solveFor.includes('I/Y') || q.solveFor.includes('IRR')) ? `${userAnswer.answer.toFixed(2)}%` : formatCurrency(userAnswer.answer);
+                }
+                const correctAnswerFormatted = (q.solveFor.includes('I/Y') || q.solveFor.includes('IRR')) ? `${q.answer.toFixed(2)}%` : formatCurrency(q.answer);
+
+                const row = document.createElement('tr');
+                row.className = userAnswer.correct ? 'bg-green-100' : 'bg-red-100';
+                row.innerHTML = `
+                    <td>${q.id}</td>
+                    <td>${userAnswerFormatted}</td>
+                    <td>${correctAnswerFormatted}</td>
+                    <td>${userAnswer.correct ? '✔️' : '❌'}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+        
+        function downloadSummary() {
+            let summaryText = `TVOM Practice Summary\n`;
+            summaryText += `Final Score: ${userAnswers.filter(a => a.correct).length} / ${questions.length}\n\n`;
+            
+            questions.forEach((q, i) => {
+                const userAnswer = userAnswers[i];
+                let userAnswerFormatted = 'No Answer';
+                if(userAnswer.answer !== null) {
+                    userAnswerFormatted = (q.solveFor.includes('I/Y') || q.solveFor.includes('IRR')) ? `${userAnswer.answer.toFixed(2)}%` : formatCurrency(userAnswer.answer);
+                }
+                const correctAnswerFormatted = (q.solveFor.includes('I/Y') || q.solveFor.includes('IRR')) ? `${q.answer.toFixed(2)}%` : formatCurrency(q.answer);
+
+                summaryText += `----------------------------------------\n`;
+                summaryText += `Question ${q.id}:\n${q.text.replace(/<[^>]*>?/gm, '')}\n\n`;
+                summaryText += `Your Answer: ${userAnswerFormatted}\n`;
+                summaryText += `Correct Answer: ${correctAnswerFormatted}\n`;
+                summaryText += `Result: ${userAnswer.correct ? 'Correct' : 'Incorrect'}\n\n`;
+            });
+
+            const blob = new Blob([summaryText], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'tvom_summary.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function startNewQuiz() {
+            $('#summary-container').classList.add('hidden');
+            $('#quiz-container').classList.remove('hidden');
+            $('#navigation-container').classList.remove('hidden');
+            $('#finish-container').classList.add('hidden');
+            currentQuestionIndex = 0;
+            generateProblems();
+            renderQuestions();
+        }
+
+        // --- INITIALIZATION ---
+        window.onload = () => {
+            startNewQuiz();
+            $('#close-modal-btn').addEventListener('click', () => $('#walkthrough-modal').style.display = 'none');
+            window.addEventListener('click', (event) => {
+                if (event.target == $('#walkthrough-modal')) $('#walkthrough-modal').style.display = 'none';
+                if (event.target == $('#gif-modal')) $('#gif-modal').style.display = 'none';
+            });
+            $('#download-summary-btn').addEventListener('click', downloadSummary);
+            $('#new-problems-btn').addEventListener('click', startNewQuiz);
+            $('#prev-btn').addEventListener('click', () => navigate(-1));
+            $('#next-btn').addEventListener('click', () => navigate(1));
+            $('#finish-btn').addEventListener('click', showSummary);
+        };
+    </script>
+
+</body>
+</html>
