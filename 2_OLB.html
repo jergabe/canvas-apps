@@ -237,8 +237,8 @@
             let outstandingBalance = 0;
 
             if (i === 0) {
-                // For 0% interest, balance is original loan minus payments made
-                outstandingBalance = loanAmount - (monthlyPayment * n_current);
+                // For 0% interest, loanAmount is positive and monthlyPayment is negative, so this correctly subtracts payments made.
+                outstandingBalance = loanAmount + (monthlyPayment * n_current);
             } else {
                 const remainingPayments = n_total - n_current;
                 
@@ -246,19 +246,20 @@
                     outstandingBalance = endTermBalloon > 0 ? endTermBalloon : 0;
                 } else {
                     // **--- CORRECTED LOGIC START ---**
-                    // Calculate the positive PV of the remaining regular payments.
-                    const pv_remaining_payments = monthlyPayment * ((1 - Math.pow(1 + i, -remainingPayments)) / i);
+
+                    // Calculate the positive PV of payments using Math.abs() on the (negative) monthlyPayment.
+                    const pv_remaining_payments = Math.abs(monthlyPayment) * ((1 - Math.pow(1 + i, -remainingPayments)) / i);
                     
-                    // Calculate the positive PV of the end-of-term balloon payment.
+                    // Calculate the positive PV of the (positive) balloon payment.
                     const pv_balloon = endTermBalloon / Math.pow(1 + i, remainingPayments);
                     
                     // The outstanding balance is the SUM of the PV of all future liabilities.
                     outstandingBalance = pv_remaining_payments + pv_balloon;
+                    
                     // **--- CORRECTED LOGIC END ---**
                 }
             }
-            // Ensure we return a positive number, rounded to 2 decimal places.
-            return Math.abs(outstandingBalance);
+            return outstandingBalance;
         }
 
 
