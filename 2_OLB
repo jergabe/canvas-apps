@@ -129,7 +129,7 @@
             annualRate: 0,
             mortgageType: '',
             loanTermYears: 0,
-            endTermBalloon: 0,
+            endTermBalloon: 0, // This is the value we want to log
             balancePeriodYears: 0, // The period for which the user calculates the balance
             monthlyPayment: 0,
             correctAnswer: 0,
@@ -284,6 +284,7 @@
                     loanAmount: state.loanAmount,
                     mortgageStructure: state.mortgageType,
                     mortgageTermMonths: state.loanTermYears * 12,
+                    endTermBalloon: state.endTermBalloon, // *** NEW: Include balloon payment here ***
                     interestRateAnnual: state.annualRate,
                     futurePeriodYears: state.balancePeriodYears,
                     correctAnswer: state.correctAnswer,
