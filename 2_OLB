@@ -103,7 +103,7 @@
 
     <script>
         // PASTE YOUR WEB APP URL HERE AFTER DEPLOYING GOOGLE SCRIPT
-        const SCRIPT_URL = "YOUR_GOOGLE_SHEET_WEB_APP_URL"; 
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwZ6dcvrBHwEiDcA3ExioOONa7Tdhh9iKHdiWJtULh9n8USjlZWerZl0KccSygtrVT/exec"; 
 
         // --- DOM Element References ---
         const codewordEl = document.getElementById('codeword');
