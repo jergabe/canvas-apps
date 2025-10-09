@@ -228,7 +228,7 @@
             return { payment: payment, fv: Math.abs(fv_signed) }; // Return payment and the absolute value of balloon for display
         }
 
-        // Function to calculate outstanding loan balance
+// Function to calculate outstanding loan balance
         function calculateOutstandingBalance(loanAmount, monthlyPayment, annualRate, loanTermYears, mortgageType, endTermBalloon, currentPeriodYears) {
             const i = annualRate / 100 / 12; // Monthly interest rate
             const n_total = loanTermYears * 12; // Total number of months in loan term
@@ -238,20 +238,27 @@
 
             if (i === 0) {
                 // For 0% interest, balance is original loan minus payments made
-                outstandingBalance = loanAmount + (monthlyPayment * n_current);
+                outstandingBalance = loanAmount - (monthlyPayment * n_current);
             } else {
-                // PV method (discounting remaining payments and balloon)
                 const remainingPayments = n_total - n_current;
                 
                 if (remainingPayments <= 0) { // If past or at the end of the loan term
-                    outstandingBalance = endTermBalloon; // Should be 0 for Full, actual balloon for Partial/Negative
+                    outstandingBalance = endTermBalloon > 0 ? endTermBalloon : 0;
                 } else {
-                    const pv_remaining_payments = -monthlyPayment * ((1 - Math.pow(1 + i, -remainingPayments)) / i);
-                    const pv_balloon = -endTermBalloon / Math.pow(1 + i, remainingPayments);
+                    // **--- CORRECTED LOGIC START ---**
+                    // Calculate the positive PV of the remaining regular payments.
+                    const pv_remaining_payments = monthlyPayment * ((1 - Math.pow(1 + i, -remainingPayments)) / i);
+                    
+                    // Calculate the positive PV of the end-of-term balloon payment.
+                    const pv_balloon = endTermBalloon / Math.pow(1 + i, remainingPayments);
+                    
+                    // The outstanding balance is the SUM of the PV of all future liabilities.
                     outstandingBalance = pv_remaining_payments + pv_balloon;
+                    // **--- CORRECTED LOGIC END ---**
                 }
             }
-            return outstandingBalance;
+            // Ensure we return a positive number, rounded to 2 decimal places.
+            return Math.abs(outstandingBalance);
         }
 
 
