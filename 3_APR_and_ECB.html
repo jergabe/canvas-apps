@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APR & Effective Cost of Borrowing Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .step-container {
+            transition: all 0.3s ease-in-out;
+            opacity: 1;
+        }
+        .step-container.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+            <header class="text-center mb-6">
+                <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">APR & Effective Cost Calculator</h1>
+                <p class="text-gray-600 mt-2">Calculate the APR and Effective Cost of Borrowing for a loan.</p>
+            </header>
+            
+            <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <label for="codeword" class="block text-lg font-medium text-blue-800">Enter Your Class Codeword:</label>
+                <input type="text" id="codeword" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Your attempt will be logged with this codeword">
+            </div>
+            
+            <div id="problem-container" class="space-y-4">
+                 <h2 class="text-2xl font-bold text-center text-gray-800 mb-4 border-b pb-2">Loan Scenario</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-center">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-lg text-gray-700">Loan Amount:</h3>
+                        <p id="loan-amount" class="text-2xl font-bold text-indigo-600"></p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-lg text-gray-700">Annual Interest Rate:</h3>
+                        <p id="interest-rate" class="text-2xl font-bold text-indigo-600"></p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-lg text-gray-700">Loan Term:</h3>
+                        <p id="loan-term" class="text-xl font-bold text-indigo-600"></p>
+                    </div>
+                     <div class="bg-yellow-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-lg text-yellow-800">Lender Fees:</h3>
+                        <p id="lender-fees" class="text-2xl font-bold text-yellow-600"></p>
+                    </div>
+                    <div class="bg-yellow-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-lg text-yellow-800">Third-Party Fees:</h3>
+                        <p id="third-party-fees" class="text-2xl font-bold text-yellow-600"></p>
+                    </div>
+                    <div class="bg-red-50 p-4 rounded-lg border-l-4 border-red-400">
+                        <h3 class="font-semibold text-lg text-red-800">Holding Period:</h3>
+                        <p id="holding-period" class="text-2xl font-bold text-red-600"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="steps-container" class="mt-8 space-y-6">
+                <!-- Step 1: Mortgage Payment -->
+                <div id="step-1-container" class="step-container p-5 bg-white border rounded-lg shadow-sm">
+                    <h3 class="text-xl font-semibold text-gray-800">Step 1: Calculate Monthly Mortgage Payment ($)</h3>
+                    <p class="text-gray-500 mb-3">Based on the full loan term.</p>
+                    <div class="flex flex-col sm:flex-row items-center gap-3">
+                        <input type="number" id="step-1-answer" class="flex-grow w-full px-4 py-2 text-lg border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Enter your answer">
+                        <button id="step-1-check" class="w-full sm:w-auto bg-indigo-600 text-white font-bold py-2 px-6 rounded-md hover:bg-indigo-700">Check Step 1</button>
+                    </div>
+                    <div id="step-1-feedback" class="mt-3 p-3 rounded-md text-center hidden"></div>
+                    <div id="step-1-hint" class="text-sm mt-2"></div>
+                </div>
+
+                <!-- Step 2: APR (Moved Up) -->
+                <div id="step-2-container" class="step-container disabled p-5 bg-white border rounded-lg shadow-sm">
+                    <h3 class="text-xl font-semibold text-gray-800">Step 2: Calculate Annual Percentage Rate (%)</h3>
+                    <p class="text-gray-500 mb-3">Based on the full loan term.</p>
+                    <div class="flex flex-col sm:flex-row items-center gap-3">
+                        <input type="number" id="step-2-answer" class="flex-grow w-full px-4 py-2 text-lg border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Enter as a percentage (e.g., 7.25)">
+                        <button id="step-2-check" class="w-full sm:w-auto bg-indigo-600 text-white font-bold py-2 px-6 rounded-md hover:bg-indigo-700">Check Step 2</button>
+                    </div>
+                    <div id="step-2-feedback" class="mt-3 p-3 rounded-md text-center hidden"></div>
+                    <div id="step-2-hint" class="text-sm mt-2"></div>
+                </div>
+
+                <!-- Step 3: Outstanding Loan Balance (Moved Down) -->
+                <div id="step-3-container" class="step-container disabled p-5 bg-white border rounded-lg shadow-sm">
+                    <h3 class="text-xl font-semibold text-gray-800">Step 3: Calculate Outstanding Loan Balance ($)</h3>
+                    <p class="text-gray-500 mb-3">At the end of the holding period.</p>
+                    <div class="flex flex-col sm:flex-row items-center gap-3">
+                        <input type="number" id="step-3-answer" class="flex-grow w-full px-4 py-2 text-lg border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Enter your answer">
+                        <button id="step-3-check" class="w-full sm:w-auto bg-indigo-600 text-white font-bold py-2 px-6 rounded-md hover:bg-indigo-700">Check Step 3</button>
+                    </div>
+                    <div id="step-3-feedback" class="mt-3 p-3 rounded-md text-center hidden"></div>
+                    <div id="step-3-hint" class="text-sm mt-2"></div>
+                </div>
+
+                <!-- Step 4: Effective Cost of Borrowing -->
+                <div id="step-4-container" class="step-container disabled p-5 bg-white border rounded-lg shadow-sm">
+                    <h3 class="text-xl font-semibold text-gray-800">Step 4: Calculate Effective Cost of Borrowing (%)</h3>
+                     <p class="text-gray-500 mb-3">Based on the holding period.</p>
+                    <div class="flex flex-col sm:flex-row items-center gap-3">
+                        <input type="number" id="step-4-answer" class="flex-grow w-full px-4 py-2 text-lg border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Enter as a percentage (e.g., 7.50)">
+                        <button id="step-4-check" class="w-full sm:w-auto bg-indigo-600 text-white font-bold py-2 px-6 rounded-md hover:bg-indigo-700">Check Step 4</button>
+                    </div>
+                    <div id="step-4-feedback" class="mt-3 p-3 rounded-md text-center hidden"></div>
+                    <div id="step-4-hint" class="text-sm mt-2"></div>
+                </div>
+            </div>
+            
+            <div id="completion-container" class="mt-8 text-center hidden">
+                 <p class="text-2xl font-bold text-green-600 bg-green-50 p-4 rounded-lg">Congratulations! You've completed the problem.</p>
+                <button id="new-problem" class="mt-4 bg-green-600 text-white font-bold py-3 px-8 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out">New Loan Problem</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // PASTE YOUR NEW GOOGLE SCRIPT WEB APP URL HERE
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwZ6dcvrBHwEiDcA3ExioOONa7Tdhh9iKHdiWJtULh9n8USjlZWerZl0KccSygtrVT/exec"; // Replace with your new URL
+
+        // --- DOM ELEMENT REFERENCES ---
+        const elements = {
+            codeword: document.getElementById('codeword'),
+            problem: {
+                loanAmount: document.getElementById('loan-amount'),
+                interestRate: document.getElementById('interest-rate'),
+                loanTerm: document.getElementById('loan-term'),
+                lenderFees: document.getElementById('lender-fees'),
+                thirdPartyFees: document.getElementById('third-party-fees'),
+                holdingPeriod: document.getElementById('holding-period'),
+            },
+            steps: [
+                { container: document.getElementById('step-1-container'), answer: document.getElementById('step-1-answer'), checkBtn: document.getElementById('step-1-check'), feedback: document.getElementById('step-1-feedback'), hint: document.getElementById('step-1-hint') },
+                { container: document.getElementById('step-2-container'), answer: document.getElementById('step-2-answer'), checkBtn: document.getElementById('step-2-check'), feedback: document.getElementById('step-2-feedback'), hint: document.getElementById('step-2-hint') },
+                { container: document.getElementById('step-3-container'), answer: document.getElementById('step-3-answer'), checkBtn: document.getElementById('step-3-check'), feedback: document.getElementById('step-3-feedback'), hint: document.getElementById('step-3-hint') },
+                { container: document.getElementById('step-4-container'), answer: document.getElementById('step-4-answer'), checkBtn: document.getElementById('step-4-check'), feedback: document.getElementById('step-4-feedback'), hint: document.getElementById('step-4-hint') },
+            ],
+            completionContainer: document.getElementById('completion-container'),
+            newProblemBtn: document.getElementById('new-problem'),
+        };
+
+        // --- STATE MANAGEMENT ---
+        let state = {};
+
+        function resetState() {
+             state = {
+                currentStep: 1,
+                attempts: 0,
+                problemData: {},
+                studentAnswers: {
+                    step1_pmt: { attempt1: null, attempt2: null, isCorrect: false },
+                    step2_apr: { attempt1: null, attempt2: null, isCorrect: false },
+                    step3_olb: { attempt1: null, attempt2: null, isCorrect: false },
+                    step4_ecb: { attempt1: null, attempt2: null, isCorrect: false },
+                },
+                timestamp: new Date().toISOString()
+            };
+        }
+
+        // --- CORE CALCULATIONS ---
+        
+        // RATE function similar to Excel, using binary search (bisection method)
+        function calculateRate(nper, pmt, pv, fv = 0, maxIterations = 100, tolerance = 1e-6) {
+            let low = 0;
+            let high = 1;
+            let mid;
+
+            for (let i = 0; i < maxIterations; i++) {
+                mid = (low + high) / 2;
+                if (mid === 0) return 0; // Avoid division by zero
+
+                const calculatedPv = pmt * (1 - Math.pow(1 + mid, -nper)) / mid + fv / Math.pow(1 + mid, nper);
+                
+                if (Math.abs(calculatedPv + pv) < tolerance) {
+                    return mid;
+                }
+
+                if (calculatedPv > -pv) {
+                    high = mid; // Rate is too high, lower the upper bound
+                } else {
+                    low = mid; // Rate is too low, raise the lower bound
+                }
+            }
+            return mid; // Return the best guess if it doesn't converge
+        }
+
+        function calculatePayment(pv, annualRate, termYears) {
+            const i = annualRate / 100 / 12;
+            const n = termYears * 12;
+            if (i === 0) return pv / n;
+            const pmt = pv * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1);
+            return pmt;
+        }
+
+        // Outstanding balance using FV method
+        function calculateOutstandingBalance(pv, pmt, annualRate, n_current) {
+            const i = annualRate / 100 / 12;
+            if (i === 0) return pv - (pmt * n_current);
+            const fv_loan = pv * Math.pow(1 + i, n_current);
+            const fv_payments = pmt * ((Math.pow(1 + i, n_current) - 1) / i);
+            return fv_loan - fv_payments;
+        }
+
+
+        // --- PROBLEM GENERATION ---
+        async function generateNewProblem() {
+            resetState();
+            
+            // 1. Generate random inputs
+            const loanAmount = Math.round((Math.random() * (1500000 - 200000) + 200000) / 1000) * 1000;
+            
+            const minRate = 5.75, maxRate = 7.25;
+            // Round the interest rate to the nearest 1/8th of a percent (0.125)
+            const rawRate = Math.random() * (maxRate - minRate) + minRate;
+            const annualRate = parseFloat((Math.round(rawRate / 0.125) * 0.125).toFixed(3));
+            
+            const normalizedRate = (annualRate - minRate) / (maxRate - minRate); // 0 for low rate, 1 for high rate
+            const baseLenderFee = 12000 - (normalizedRate * (12000 - 1500)); // Inversely related
+            const lenderFees = Math.round((baseLenderFee + (Math.random() * 2000 - 1000)) / 100) * 100;
+
+            const thirdPartyFees = Math.round((Math.random() * (8000 - 4000) + 4000) / 100) * 100;
+            
+            const termOptions = [15, 20, 30];
+            const loanTermYears = termOptions[Math.floor(Math.random() * termOptions.length)];
+            
+            const holdingPeriodYears = Math.floor(Math.random() * (Math.min(loanTermYears - 2, 10) - 3 + 1)) + 3;
+
+            // 2. Calculate correct answers
+            const monthlyPayment = calculatePayment(loanAmount, annualRate, loanTermYears);
+            const olb = calculateOutstandingBalance(loanAmount, monthlyPayment, annualRate, holdingPeriodYears * 12);
+
+            const n_hold = holdingPeriodYears * 12;
+            const n_full_term = loanTermYears * 12;
+
+            // APR uses the full term and assumes the loan is fully paid off (FV=0)
+            const apr_monthly = calculateRate(n_full_term, -monthlyPayment, loanAmount - lenderFees, 0);
+            const apr = apr_monthly * 12 * 100;
+
+            // ECB N uses the holding period and the outstanding balance at prepayment as the FV
+            const ecb_monthly = calculateRate(n_hold, -monthlyPayment, loanAmount - lenderFees - thirdPartyFees, -olb);
+            const ecb = ecb_monthly * 12 * 100;
+
+            // 3. Store in state
+            state.problemData = {
+                loanAmount, annualRate, loanTermYears, lenderFees, thirdPartyFees, holdingPeriodYears,
+                correctAnswers: {
+                    1: monthlyPayment,
+                    2: apr,
+                    3: olb,
+                    4: ecb
+                }
+            };
+
+            // 4. Update UI
+            updateProblemDisplay();
+            resetUIForNewProblem();
+        }
+
+        // --- UI UPDATES ---
+        function updateProblemDisplay() {
+            const { loanAmount, annualRate, loanTermYears, lenderFees, thirdPartyFees, holdingPeriodYears } = state.problemData;
+            elements.problem.loanAmount.textContent = `$${loanAmount.toLocaleString()}`;
+            elements.problem.interestRate.textContent = `${annualRate.toFixed(3)}%`;
+            elements.problem.loanTerm.textContent = `${loanTermYears} Years Full Amortisation`;
+            elements.problem.lenderFees.textContent = `$${lenderFees.toLocaleString()}`;
+            elements.problem.thirdPartyFees.textContent = `$${thirdPartyFees.toLocaleString()}`;
+            elements.problem.holdingPeriod.textContent = `${holdingPeriodYears} Years`;
+        }
+
+        function resetUIForNewProblem() {
+            elements.steps.forEach((step, index) => {
+                step.container.classList.add('disabled');
+                step.answer.value = '';
+                step.answer.disabled = false;
+                step.checkBtn.disabled = false;
+                step.feedback.classList.add('hidden');
+                step.hint.innerHTML = '';
+            });
+            elements.steps[0].container.classList.remove('disabled');
+            elements.completionContainer.classList.add('hidden');
+            elements.codeword.disabled = false;
+        }
+
+        function showFeedback(step, message, type) {
+            const feedbackEl = elements.steps[step - 1].feedback;
+            feedbackEl.textContent = message;
+            feedbackEl.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700');
+            if (type === 'success') {
+                feedbackEl.classList.add('bg-green-100', 'text-green-700');
+            } else {
+                feedbackEl.classList.add('bg-red-100', 'text-red-700');
+            }
+        }
+
+        function provideHint(step) {
+            const hintEl = elements.steps[step - 1].hint;
+            const { loanAmount, annualRate, loanTermYears, lenderFees, thirdPartyFees, holdingPeriodYears, correctAnswers } = state.problemData;
+            
+            let hintHtml = `<div class="text-left w-full max-w-lg mx-auto mt-4 p-4 bg-gray-50 rounded-lg">
+                                <p class="font-bold text-gray-800 mb-2">Calculator Inputs Hint:</p>
+                                <div class="grid grid-cols-2 gap-x-4 gap-y-2">`;
+            
+            switch (step) {
+                case 1: // Payment
+                    hintHtml += `<div class="font-semibold text-gray-700">N:</div><div class="font-mono">${loanTermYears * 12}</div>`;
+                    hintHtml += `<div class="font-semibold text-gray-700">I/Y (annual):</div><div class="font-mono">${annualRate.toFixed(3)}</div>`;
+                    hintHtml += `<div class="font-semibold text-gray-700">PV:</div><div class="font-mono">${loanAmount.toFixed(2)}</div>`;
+                    hintHtml += `<div class="font-semibold text-gray-700">FV:</div><div class="font-mono">0</div>`;
+                    break;
+                case 2: // APR
+                    hintHtml += `<div class="font-semibold text-gray-700">N:</div><div class="font-mono">${loanTermYears * 12}</div>`;
+                    hintHtml += `<div class="font-semibold text-gray-700">PMT:</div><div class="font-mono">${(-correctAnswers[1]).toFixed(2)}</div>`;
+                    hintHtml += `<div class="font-semibold text-gray-700">PV:</div><div class="font-mono">${(loanAmount - lenderFees).toFixed(2)}</div>`;
+                    hintHtml += `<div class="font-semibold text-gray-700">FV:</div><div class="font-mono">0</div>`;
+                    break;
+                case 3: // OLB
+                    hintHtml += `<div class="font-semibold text-gray-700">N (holding period):</div><div class="font-mono">${holdingPeriodYears * 12}</div>`;
+                    hintHtml += `<div class="font-semibold text-gray-700">I/Y (annual):</div><div class="font-mono">${annualRate.toFixed(3)}</div>`;
+                    hintHtml += `<div class="font-semibold text-gray-700">PV:</div><div class="font-mono">${loanAmount.toFixed(2)}</div>`;
+                    hintHtml += `<div class="font-semibold text-gray-700">PMT:</div><div class="font-mono">${correctAnswers[1].toFixed(2)}</div>`;
+                    break;
+                case 4: // ECB
+                    hintHtml += `<div class="font-semibold text-gray-700">N:</div><div class="font-mono">${holdingPeriodYears * 12}</div>`;
+                    hintHtml += `<div class="font-semibold text-gray-700">PMT:</div><div class="font-mono">${(-correctAnswers[1]).toFixed(2)}</div>`;
+                    hintHtml += `<div class="font-semibold text-gray-700">PV:</div><div class="font-mono">${(loanAmount - lenderFees - thirdPartyFees).toFixed(2)}</div>`;
+                    hintHtml += `<div class="font-semibold text-gray-700">FV:</div><div class="font-mono">${(-correctAnswers[3]).toFixed(2)}</div>`;
+                    break;
+            }
+            hintHtml += `</div></div>`;
+            hintEl.innerHTML = hintHtml;
+        }
+
+        function advanceToNextStep(currentStep) {
+            const currentStepIndex = currentStep - 1;
+            elements.steps[currentStepIndex].answer.disabled = true;
+            elements.steps[currentStepIndex].checkBtn.disabled = true;
+            elements.steps[currentStepIndex].container.classList.add('disabled');
+
+            state.attempts = 0; // Reset attempts for the next step
+
+            if (currentStep < 4) {
+                elements.steps[currentStep].container.classList.remove('disabled');
+            } else {
+                // All steps completed
+                elements.completionContainer.classList.remove('hidden');
+                logFinalData();
+            }
+        }
+
+        // --- EVENT HANDLING ---
+        function checkAnswer(step) {
+            const stepIndex = step - 1;
+            const studentAnswerEl = elements.steps[stepIndex].answer;
+            let studentAnswer = parseFloat(studentAnswerEl.value);
+            
+            if (isNaN(studentAnswer)) {
+                showFeedback(step, "Please enter a valid number.", "error");
+                return;
+            }
+            elements.codeword.disabled = true;
+            
+            // Handle decimal input for percentage questions
+            if ((step === 2 || step === 4) && studentAnswer > 0 && studentAnswer < 1) {
+                studentAnswer *= 100;
+            }
+
+            state.attempts++;
+            
+            const correctAnswer = state.problemData.correctAnswers[step];
+            const answerKey = Object.keys(state.studentAnswers)[stepIndex];
+            
+            if (state.attempts === 1) state.studentAnswers[answerKey].attempt1 = parseFloat(studentAnswerEl.value);
+            if (state.attempts === 2) state.studentAnswers[answerKey].attempt2 = parseFloat(studentAnswerEl.value);
+
+            const tolerance = (step === 2 || step === 4) ? 0.015 : 1.0; // Tighter tolerance for percentages
+            const isCorrect = Math.abs(studentAnswer - correctAnswer) <= tolerance;
+
+            if (isCorrect) {
+                showFeedback(step, "Correct!", "success");
+                state.studentAnswers[answerKey].isCorrect = true;
+                advanceToNextStep(step);
+            } else {
+                if (state.attempts === 1) {
+                    // Special hint for monthly rate
+                    if (step === 2 || step === 4) {
+                        const monthlyCorrectPercent = correctAnswer / 12;
+                        const monthlyCorrectDecimal = monthlyCorrectPercent / 100;
+                        const originalAnswer = parseFloat(studentAnswerEl.value);
+                        if (Math.abs(originalAnswer - monthlyCorrectPercent) < (monthlyCorrectPercent * 0.5) || Math.abs(originalAnswer - monthlyCorrectDecimal) < (monthlyCorrectDecimal * 0.5)) {
+                            showFeedback(step, "Hint: That looks like a monthly rate. Please provide the annual rate.", "error");
+                            provideHint(step);
+                            return; 
+                        }
+                    }
+                    showFeedback(step, "Incorrect. Please try again.", "error");
+                    provideHint(step);
+                } else {
+                    const formattedAnswer = (step === 2 || step === 4) ? correctAnswer.toFixed(4) : correctAnswer.toFixed(2);
+                    showFeedback(step, `The correct answer is ${formattedAnswer}. Moving to the next step.`, "error");
+                    state.studentAnswers[answerKey].isCorrect = false;
+                    advanceToNextStep(step);
+                }
+            }
+        }
+        
+        elements.steps.forEach((step, index) => {
+            step.checkBtn.addEventListener('click', () => checkAnswer(index + 1));
+            step.answer.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') checkAnswer(index + 1);
+            });
+        });
+
+        elements.newProblemBtn.addEventListener('click', generateNewProblem);
+        
+        // --- DATA LOGGING ---
+        function logFinalData() {
+            if (!SCRIPT_URL || SCRIPT_URL === "YOUR_GOOGLE_SHEET_WEB_APP_URL") {
+                console.warn("SCRIPT_URL not set. Data will not be logged.");
+                return;
+            }
+            const dataToLog = {
+                timestamp: state.timestamp,
+                codeword: elements.codeword.value,
+                loanAmount: state.problemData.loanAmount,
+                annualRate: state.problemData.annualRate,
+                loanTermYears: state.problemData.loanTermYears,
+                lenderFees: state.problemData.lenderFees,
+                thirdPartyFees: state.problemData.thirdPartyFees,
+                holdingPeriodYears: state.problemData.holdingPeriodYears,
+                correctPmt: state.problemData.correctAnswers[1],
+                correctApr: state.problemData.correctAnswers[2],
+                correctOlb: state.problemData.correctAnswers[3],
+                correctEcb: state.problemData.correctAnswers[4],
+                pmtAttempt1: state.studentAnswers.step1_pmt.attempt1,
+                pmtAttempt2: state.studentAnswers.step1_pmt.attempt2,
+                pmtCorrect: state.studentAnswers.step1_pmt.isCorrect ? 'Yes' : 'No',
+                aprAttempt1: state.studentAnswers.step2_apr.attempt1,
+                aprAttempt2: state.studentAnswers.step2_apr.attempt2,
+                aprCorrect: state.studentAnswers.step2_apr.isCorrect ? 'Yes' : 'No',
+                olbAttempt1: state.studentAnswers.step3_olb.attempt1,
+                olbAttempt2: state.studentAnswers.step3_olb.attempt2,
+                olbCorrect: state.studentAnswers.step3_olb.isCorrect ? 'Yes' : 'No',
+                ecbAttempt1: state.studentAnswers.step4_ecb.attempt1,
+                ecbAttempt2: state.studentAnswers.step4_ecb.attempt2,
+                ecbCorrect: state.studentAnswers.step4_ecb.isCorrect ? 'Yes' : 'No',
+            };
+
+            fetch(SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dataToLog)
+            }).catch(err => console.error("Error logging data:", err));
+        }
+
+        // --- INITIALIZATION ---
+        window.onload = () => {
+            generateNewProblem();
+        };
+    </script>
+</body>
+</html>
+
+
