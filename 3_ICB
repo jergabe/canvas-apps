@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Incremental Cost of Borrowing (ICB) Calculator</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Inter font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* tailwind gray-50 */
+        }
+        /* Custom styles for input fields */
+        input[type="number"] {
+            -moz-appearance: textfield; /* Firefox */
+        }
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        /* Steps are shown by default */
+        .step-section {
+            display: block;
+            transition: opacity 0.3s ease-in-out;
+        }
+        /* Summary is hidden by default */
+        #summary {
+            display: none;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-3xl bg-white p-6 md:p-8 rounded-2xl shadow-lg">
+        <h1 class="text-2xl md:text-3xl font-bold text-center text-gray-800 mb-6">
+            Incremental Cost of Borrowing
+        </h1>
+
+        <!-- Problem Setup Section -->
+        <div id="problem-setup" class="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">Problem Parameters</h2>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm md:text-base">
+                <div>
+                    <span class="font-medium text-gray-500 block">House Price:</span>
+                    <span id="param-house-price" class="font-semibold text-gray-900"></span>
+                </div>
+                <div>
+                    <span class="font-medium text-gray-500 block">Interest Rate:</span>
+                    <span id="param-rate" class="font-semibold text-gray-900"></span>
+                </div>
+                <div>
+                    <span class="font-medium text-gray-500 block">Loan Term:</span>
+                    <span id="param-term" class="font-semibold text-gray-900"></span>
+                </div>
+                <div>
+                    <span class="font-medium text-gray-500 block">Repay Year:</span>
+                    <span id="param-repay-year" class="font-semibold text-gray-900"></span>
+                </div>
+                <div class="col-span-2 md:col-span-3 grid grid-cols-2 gap-4 mt-2 pt-2 border-t">
+                    <!-- Loan 1 Details -->
+                    <div class="pr-2 border-r">
+                        <h3 class="font-semibold text-blue-600 mb-1">Loan 1 (Base)</h3>
+                        <span class="font-medium text-gray-500 block">LTV:</span>
+                        <span id="param-ltv-1" class="font-semibold text-gray-900">80%</span>
+                        <span class="font-medium text-gray-500 block mt-1">Loan Amount:</span>
+                        <span id="param-loan-1" class="font-semibold text-gray-900"></span>
+                        <span class="font-medium text-gray-500 block mt-1">PMI:</span>
+                        <span class="font-semibold text-gray-900">$0.00 / month</span>
+                    </div>
+                    <!-- Loan 2 Details -->
+                    <div>
+                        <h3 class="font-semibold text-purple-600 mb-1">Loan 2 (High LTV)</h3>
+                        <span class="font-medium text-gray-500 block">LTV:</span>
+                        <span id="param-ltv-2" class="font-semibold text-gray-900"></span>
+                        <span class="font-medium text-gray-500 block mt-1">Loan Amount:</span>
+                        <span id="param-loan-2" class="font-semibold text-gray-900"></span>
+                        <span class="font-medium text-gray-500 block mt-1">PMI:</span>
+                        <span id="param-pmi" class="font-semibold text-gray-900"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Steps Container -->
+        <div id="steps-container">
+
+            <!-- Step 1: PMT 1 -->
+            <div id="step-1" class="step-section space-y-4 p-4 border-b">
+                <h2 class="text-lg font-semibold text-gray-700">Step 1: Calculate PMT for Loan 1</h2>
+                <p class="text-sm text-gray-600">Calculate the monthly Principal & Interest (P&I) payment for <strong>Loan 1 (80% LTV)</strong>. Round to two decimal places.</p>
+                <div>
+                    <label for="input-pmt1" class="block text-sm font-medium text-gray-700 mb-1">Loan 1 PMT ($)</label>
+                    <input type="number" id="input-pmt1" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Enter PMT for Loan 1">
+                </div>
+                <div id="message-1" class="text-sm"></div>
+                <button id="check-btn-1" class="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-150">Check Answer</button>
+            </div>
+
+            <!-- Step 2: PMT 2 -->
+            <div id="step-2" class="step-section space-y-4 p-4 border-b">
+                <h2 class="text-lg font-semibold text-gray-700">Step 2: Calculate PMT for Loan 2</h2>
+                <p class="text-sm text-gray-600">Calculate the monthly P&I payment for <strong>Loan 2 (High LTV)</strong>. Do not include PMI. Round to two decimal places.</p>
+                <div>
+                    <label for="input-pmt2" class="block text-sm font-medium text-gray-700 mb-1">Loan 2 PMT ($)</label>
+                    <input type="number" id="input-pmt2" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder="Enter PMT for Loan 2">
+                </div>
+                <div id="message-2" class="text-sm"></div>
+                <button id="check-btn-2" class="w-full bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-purple-700 transition duration-150">Check Answer</button>
+            </div>
+
+            <!-- Step 3: OLB 1 -->
+            <div id="step-3" class="step-section space-y-4 p-4 border-b">
+                <h2 class="text-lg font-semibold text-gray-700">Step 3: Calculate OLB for Loan 1</h2>
+                <p class="text-sm text-gray-600">Calculate the Outstanding Loan Balance (OLB) for <strong>Loan 1</strong> at the end of the <strong>Repayment Year (<span id="repay-year-3"></span>)</strong>. Round to two decimal places.</p>
+                <div>
+                    <label for="input-olb1" class="block text-sm font-medium text-gray-700 mb-1">Loan 1 OLB ($)</label>
+                    <input type="number" id="input-olb1" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Enter OLB for Loan 1">
+                </div>
+                <div id="message-3" class="text-sm"></div>
+                <button id="check-btn-3" class="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-150">Check Answer</button>
+            </div>
+
+            <!-- Step 4: OLB 2 -->
+            <div id="step-4" class="step-section space-y-4 p-4 border-b">
+                <h2 class="text-lg font-semibold text-gray-700">Step 4: Calculate OLB for Loan 2</h2>
+                <p class="text-sm text-gray-600">Calculate the OLB for <strong>Loan 2</strong> at the end of the <strong>Repayment Year (<span id="repay-year-4"></span>)</strong>. Round to two decimal places.</p>
+                <div>
+                    <label for="input-olb2" class="block text-sm font-medium text-gray-700 mb-1">Loan 2 OLB ($)</label>
+                    <input type="number" id="input-olb2" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder="Enter OLB for Loan 2">
+                </div>
+                <div id="message-4" class="text-sm"></div>
+                <button id="check-btn-4" class="w-full bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-purple-700 transition duration-150">Check Answer</button>
+            </div>
+
+            <!-- Step 5: ICB -->
+            <div id="step-5" class="step-section space-y-4 p-4">
+                <h2 class="text-lg font-semibold text-gray-700">Step 5: Calculate Incremental Cost of Borrowing (ICB)</h2>
+                <p class="text-sm text-gray-600">
+                    Using the cash flow differences, calculate the annual ICB.
+                    <br>
+                    <strong>Hint:</strong> Use the `RATE` function.
+                    <ul class="list-disc list-inside text-xs text-gray-500 pl-2 mt-1">
+                        <li><strong>PV:</strong> Difference in Loan Amounts (Loan 2 - Loan 1)</li>
+                        <li><strong>PMT:</strong> Difference in total monthly payments (PMT_Loan1 - (PMT_Loan2 + PMI))</li>
+                        <li><strong>FV:</strong> Difference in OLBs (OLB_Loan1 - OLB_Loan2)</li>
+                        <li><strong>NPER:</strong> Repayment period in months</li>
+                    </ul>
+                </p>
+                <div>
+                    <label for="input-icb" class="block text-sm font-medium text-gray-700 mb-1">ICB (% - Annual Rate)</label>
+                    <input type="number" id="input-icb" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500" placeholder="Enter ICB as a percentage (e.g., 8.5)">
+                </div>
+                <div id="message-5" class="text-sm"></div>
+                <button id="check-btn-5" class="w-full bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition duration-150">Check Answer</button>
+            </div>
+
+            <!-- Summary Section -->
+            <div id="summary" class="step-section space-y-4">
+                <h2 class="text-xl font-semibold text-green-700">Problem Complete!</h2>
+                <p class="text-sm text-gray-600">Here's a summary of your results. You can start a new problem or view the data log.</p>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Calculation</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Correct Answer</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Your First Answer</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Your Second Answer</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200 text-sm">
+                            <tr>
+                                <td class="px-4 py-2 whitespace-nowrap font-medium">PMT 1</td>
+                                <td id="summary-pmt1-correct" class="px-4 py-2 whitespace-nowrap"></td>
+                                <td id="summary-pmt1-1" class="px-4 py-2 whitespace-nowrap"></td>
+                                <td id="summary-pmt1-2" class="px-4 py-2 whitespace-nowrap"></td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-2 whitespace-nowrap font-medium">PMT 2</td>
+                                <td id="summary-pmt2-correct" class="px-4 py-2 whitespace-nowrap"></td>
+                                <td id="summary-pmt2-1" class="px-4 py-2 whitespace-nowrap"></td>
+                                <td id="summary-pmt2-2" class="px-4 py-2 whitespace-nowrap"></td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-2 whitespace-nowrap font-medium">OLB 1</td>
+                                <td id="summary-olb1-correct" class="px-4 py-2 whitespace-nowrap"></td>
+                                <td id="summary-olb1-1" class="px-4 py-2 whitespace-nowrap"></td>
+                                <td id="summary-olb1-2" class="px-4 py-2 whitespace-nowrap"></td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-2 whitespace-nowrap font-medium">OLB 2</td>
+                                <td id="summary-olb2-correct" class="px-4 py-2 whitespace-nowrap"></td>
+                                <td id="summary-olb2-1" class="px-4 py-2 whitespace-nowrap"></td>
+                                <td id="summary-olb2-2" class="px-4 py-2 whitespace-nowrap"></td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-2 whitespace-nowrap font-medium">ICB</td>
+                                <td id="summary-icb-correct" class="px-4 py-2 whitespace-nowrap"></td>
+                                <td id="summary-icb-1" class="px-4 py-2 whitespace-nowrap"></td>
+                                <td id="summary-icb-2" class="px-4 py-2 whitespace-nowrap"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-4 pt-4">
+                    <button id="new-problem-btn" class="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-150">Start New Problem</button>
+                </div>
+            </div>
+
+            <!-- Log Data Section (REMOVED) -->
+
+        </div> <!-- /steps-container -->
+    </div> <!-- /container -->
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- CONFIGURATION ---
+            // 1. Create a new Google Sheet.
+            // 2. Go to Extensions > Apps Script.
+            // 3. Paste the content of 'Code.gs' into the script editor.
+            // 4. Click "Deploy" > "New deployment".
+            // 5. Select "Web app" for the type.
+            // 6. In "Who has access", select "Anyone".
+            // 7. Click "Deploy" and **Authorize** the script.
+            // 8. Copy the "Web app URL" and paste it below.
+            const googleAppsScriptUrl = 'PASTE_YOUR_WEB_APP_URL_HERE';
+            
+            // --- STATE VARIABLES ---
+            let problemParams = {};
+            let correctAnswers = {};
+            let userInputs = {};
+            let attemptCounts = {};
+            let results = {};
+            // currentStep is no longer needed for UI logic
+            // let currentStep = 1; 
+
+            // --- DOM ELEMENTS ---
+            const stepElements = [
+                document.getElementById('step-1'),
+                document.getElementById('step-2'),
+                document.getElementById('step-3'),
+                document.getElementById('step-4'),
+                document.getElementById('step-5'),
+            ];
+            const summaryElement = document.getElementById('summary');
+            
+            const checkButtons = [
+                document.getElementById('check-btn-1'),
+                document.getElementById('check-btn-2'),
+                document.getElementById('check-btn-3'),
+                document.getElementById('check-btn-4'),
+                document.getElementById('check-btn-5'),
+            ];
+
+            const inputs = {
+                pmt1: document.getElementById('input-pmt1'),
+                pmt2: document.getElementById('input-pmt2'),
+                olb1: document.getElementById('input-olb1'),
+                olb2: document.getElementById('input-olb2'),
+                icb: document.getElementById('input-icb'),
+            };
+
+            const messages = {
+                pmt1: document.getElementById('message-1'),
+                pmt2: document.getElementById('message-2'),
+                olb1: document.getElementById('message-3'),
+                olb2: document.getElementById('message-4'),
+                icb: document.getElementById('message-5'),
+            };
+            
+            document.getElementById('new-problem-btn').addEventListener('click', generateNewProblem);
+            
+            // --- HELPER FUNCTIONS ---
+
+            const formatCurrency = (num) => num.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+            const formatPercent = (num, decimals = 2) => (num * 100).toFixed(decimals) + '%';
+            const round = (num) => Math.round(num * 100) / 100;
+            const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+            /**
+             * Calculates the monthly payment for a loan.
+             * @param {number} pv - Present Value (loan amount)
+             * @param {number} monthlyRate - Monthly interest rate (annual / 12)
+             * @param {number} nper - Total number of payments (term in months)
+             * @returns {number} The monthly payment
+             */
+            function calculatePMT(pv, monthlyRate, nper) {
+                if (monthlyRate === 0) return pv / nper;
+                return (pv * monthlyRate * Math.pow(1 + monthlyRate, nper)) / (Math.pow(1 + monthlyRate, nper) - 1);
+            }
+
+            /**
+             * Calculates the Outstanding Loan Balance.
+             * @param {number} pv - Original Loan Amount
+             * @param {number} monthlyRate - Monthly interest rate
+             * @param {number} nper - Total number of payments (term in months)
+             * @param {number} periodsMade - Number of payments made
+             * @returns {number} The outstanding loan balance
+             */
+            function calculateOLB(pv, monthlyRate, nper, periodsMade) {
+                if (monthlyRate === 0) return pv - (pv / nper) * periodsMade;
+                const pmt = calculatePMT(pv, monthlyRate, nper);
+                return pv * Math.pow(1 + monthlyRate, periodsMade) - (pmt * (Math.pow(1 + monthlyRate, periodsMade) - 1)) / monthlyRate;
+            }
+
+            /**
+             * JavaScript implementation of Excel's RATE function.
+             * Finds the interest rate per period of an annuity.
+             * @param {number} nper - The total number of payment periods.
+             * @param {number} pmt - The payment made each period.
+             * @param {number} pv - The present value.
+             * @param {number} fv - The future value.
+             * @param {number} type - When payments are due (0 = end of period, 1 = beginning).
+             * @param {number} guess - Your guess for what the rate will be.
+             * @returns {number} The interest rate.
+             */
+            function RATE(nper, pmt, pv, fv = 0, type = 0, guess = 0.01) {
+                const FINANCIAL_PRECISION = 1e-7;
+                const FINANCIAL_MAX_ITERATIONS = 100;
+                let rate = guess;
+
+                if (Math.abs(rate) < FINANCIAL_PRECISION) {
+                    return ( -(pv + fv) / nper - pmt) / pv;
+                }
+
+                for (let i = 0; i < FINANCIAL_MAX_ITERATIONS; i++) {
+                    const g = Math.pow(1 + rate, nper);
+                    const g_prime = nper * Math.pow(1 + rate, nper - 1);
+
+                    const f = pv * g + pmt * (g - 1) / rate * (1 + rate * type) + fv;
+                    const f_prime = pv * g_prime + pmt * (g_prime * rate - (g - 1)) / (rate * rate) * (1 + rate * type) + pmt * (g - 1) / rate * type;
+                    
+                    if (Math.abs(f_prime) < FINANCIAL_PRECISION) {
+                        return rate; // Avoid division by zero
+                    }
+                    
+                    const rate_new = rate - f / f_prime;
+                    
+                    if (Math.abs(rate_new - rate) < FINANCIAL_PRECISION) {
+                        return rate_new;
+                    }
+                    rate = rate_new;
+                }
+                return null; // Failed to converge
+            }
+
+            /**
+             * Gets the annual PMI rate based on LTV.
+             * @param {number} ltv - Loan-to-Value ratio (e.g., 85 for 85%)
+             * @returns {number} The annual PMI rate (e.g., 0.0018)
+             */
+            function getPMIRate(ltv) {
+                if (ltv >= 82 && ltv <= 84) return 0.0018;
+                if (ltv >= 85 && ltv <= 89) return 0.0027;
+                if (ltv >= 90 && ltv <= 94) return 0.0037;
+                if (ltv === 95) return 0.0055;
+                return 0; // Should not happen in this problem
+            }
+
+            // --- CORE LOGIC ---
+
+            /**
+             * Generates a new problem, calculates all correct answers, and resets the UI.
+             */
+            function generateNewProblem() {
+                // 1. Reset state
+                problemParams = {};
+                correctAnswers = {};
+                userInputs = { pmt1: [], pmt2: [], olb1: [], olb2: [], icb: [] };
+                attemptCounts = { pmt1: 0, pmt2: 0, olb1: 0, olb2: 0, icb: 0 };
+                results = { pmt1: false, pmt2: false, olb1: false, olb2: false, icb: false };
+
+                // 2. Generate random parameters
+                const housePrice = randInt(200, 600) * 1000;
+                const annualRate = randInt(500, 800) / 10000; // 5.00% to 8.00%
+                const termYears = [15, 20, 30][randInt(0, 2)];
+                const ltv1 = 0.80;
+                const ltv2Percent = randInt(82, 95);
+                const ltv2 = ltv2Percent / 100;
+                const repayYear = randInt(3, 12);
+
+                const loanAmount1 = housePrice * ltv1;
+                const loanAmount2 = housePrice * ltv2;
+                const monthlyRate = annualRate / 12;
+                const nper = termYears * 12;
+                const repayMonths = repayYear * 12;
+                
+                const pmiAnnualRate = getPMIRate(ltv2Percent);
+                const pmiMonthly = (loanAmount2 * pmiAnnualRate) / 12;
+
+                problemParams = {
+                    housePrice,
+                    annualRate,
+                    termYears,
+                    ltv1,
+                    ltv2,
+                    ltv2Percent,
+                    repayYear,
+                    repayMonths,
+                    loanAmount1,
+                    loanAmount2,
+                    monthlyRate,
+                    nper,
+                    pmiAnnualRate,
+                    pmiMonthly
+                };
+
+                // 3. Calculate all correct answers
+                const pmt1 = calculatePMT(loanAmount1, monthlyRate, nper);
+                const pmt2 = calculatePMT(loanAmount2, monthlyRate, nper);
+                const olb1 = calculateOLB(loanAmount1, monthlyRate, nper, repayMonths);
+                const olb2 = calculateOLB(loanAmount2, monthlyRate, nper, repayMonths);
+
+                // ICB Calculation
+                const icb_pv = loanAmount2 - loanAmount1;
+                const icb_pmt = pmt1 - (pmt2 + pmiMonthly); // From user perspective: (PMT2+PMI) - PMT1 is extra cost.
+                const icb_fv = olb1 - olb2; // From user perspective: OLB2 - OLB1 is extra cost.
+                const icb_nper = repayMonths;
+                
+                const icb_monthly = RATE(icb_nper, icb_pmt, icb_pv, icb_fv);
+                const icb_annual = icb_monthly * 12;
+
+                correctAnswers = {
+                    pmt1: round(pmt1),
+                    pmt2: round(pmt2),
+                    olb1: round(olb1),
+                    olb2: round(olb2),
+                    icb: round(icb_annual * 100) // Store as percentage, e.g., 8.5
+                };
+                
+                // 4. Update UI
+                document.getElementById('param-house-price').textContent = formatCurrency(housePrice);
+                document.getElementById('param-rate').textContent = formatPercent(annualRate);
+                document.getElementById('param-term').textContent = `${termYears} Years (${nper} months)`;
+                document.getElementById('param-repay-year').textContent = `${repayYear} (${repayMonths} months)`;
+                
+                document.getElementById('param-loan-1').textContent = formatCurrency(loanAmount1);
+                
+                document.getElementById('param-ltv-2').textContent = `${ltv2Percent}%`;
+                document.getElementById('param-loan-2').textContent = formatCurrency(loanAmount2);
+                document.getElementById('param-pmi').textContent = `${formatCurrency(pmiMonthly)} / month (${formatPercent(pmiAnnualRate, 2)}/yr)`;
+
+                document.getElementById('repay-year-3').textContent = `Year ${repayYear}`;
+                document.getElementById('repay-year-4').textContent = `Year ${repayYear}`;
+
+                // 5. Reset input fields and messages
+                Object.values(inputs).forEach(input => {
+                    input.value = '';
+                    input.disabled = true; // Disable all first
+                });
+                Object.values(messages).forEach(msg => {
+                    msg.textContent = '';
+                    msg.classList.remove('text-red-600', 'text-green-600', 'text-yellow-600');
+                });
+                
+                // 6. Reset check buttons
+                checkButtons.forEach(btn => btn.disabled = true); // Disable all first
+
+                // 7. Set initial step
+                stepElements.forEach(el => {
+                    el.style.display = 'block';
+                    el.classList.add('opacity-50');
+                });
+                summaryElement.style.display = 'none';
+
+                // Enable Step 1
+                inputs.pmt1.disabled = false;
+                checkButtons[0].disabled = false;
+                stepElements[0].classList.remove('opacity-50');
+            }
+
+            
+            /**
+             * Unlocks the next step in the sequence.
+             * @param {string} completedStepKey - The key of the step just completed (e.g., 'pmt1')
+             */
+            function unlockNextStep(completedStepKey) {
+                let nextStepIndex = -1;
+                switch (completedStepKey) {
+                    case 'pmt1': nextStepIndex = 1; break; // Unlock pmt2
+                    case 'pmt2': nextStepIndex = 2; break; // Unlock olb1
+                    case 'olb1': nextStepIndex = 3; break; // Unlock olb2
+                    case 'olb2': nextStepIndex = 4; break; // Unlock icb
+                    case 'icb':
+                        showSummary();
+                        return;
+                }
+
+                if (nextStepIndex !== -1 && nextStepIndex < stepElements.length) {
+                    const stepKey = Object.keys(inputs)[nextStepIndex];
+                    inputs[stepKey].disabled = false;
+                    checkButtons[nextStepIndex].disabled = false;
+                    stepElements[nextStepIndex].classList.remove('opacity-50');
+                    inputs[stepKey].focus(); // Focus on the new input
+                }
+            }
+            
+            /**
+             * Main function to check user's answer for a given step.
+             * @param {string} stepKey - The key for the step (e.g., 'pmt1', 'olb2')
+             * @param {number} tolerance - The acceptable difference.
+             */
+            function checkAnswer(stepKey, tolerance) {
+                const inputEl = inputs[stepKey];
+                const messageEl = messages[stepKey];
+                const checkBtn = document.getElementById(`check-btn-${stepKey.replace(/\D/g, '') || '5'}`); // Hacky way to get btn number
+
+                const userAnswer = parseFloat(inputEl.value);
+                if (isNaN(userAnswer)) {
+                    messageEl.textContent = 'Please enter a valid number.';
+                    messageEl.className = 'text-sm text-red-600';
+                    return;
+                }
+                
+                const correctAnswer = correctAnswers[stepKey];
+                attemptCounts[stepKey]++;
+                userInputs[stepKey].push(userAnswer);
+
+                if (Math.abs(userAnswer - correctAnswer) <= tolerance) {
+                    // CORRECT
+                    results[stepKey] = true;
+                    messageEl.textContent = `Correct! The answer is ${stepKey === 'icb' ? formatPercent(correctAnswer / 100) : formatCurrency(correctAnswer)}.`;
+                    messageEl.className = 'text-sm text-green-600 font-semibold';
+                    checkBtn.disabled = true;
+                    inputEl.disabled = true;
+                    
+                    // Move to next step
+                    setTimeout(() => unlockNextStep(stepKey), 1000); // New logic
+
+                } else {
+                    // INCORRECT
+                    if (attemptCounts[stepKey] === 1) {
+                        // First mistake
+                        let hint = "That's not quite right. ";
+                        if (stepKey.includes('pmt')) {
+                            hint += "Check your inputs: PV, monthly rate (annual/12), and NPER (term * 12).";
+                        } else if (stepKey.includes('olb')) {
+                            hint += "Check your periods_made (repay_year * 12) and the PMT value.";
+                        } else if (stepKey === 'icb') {
+                            hint += "Check your cash flow differences (PV, PMT, FV) and NPER. Remember PMT and FV should have opposite signs to PV.";
+                        }
+                        messageEl.textContent = hint + " Please try again.";
+                        messageEl.className = 'text-sm text-yellow-600';
+                        inputEl.select();
+                    } else {
+                        // Second mistake
+                        results[stepKey] = false;
+                        const formattedAnswer = stepKey === 'icb' ? formatPercent(correctAnswer / 100) : formatCurrency(correctAnswer);
+                        messageEl.textContent = `The correct answer is ${formattedAnswer}. Let's move to the next step.`;
+                        messageEl.className = 'text-sm text-red-600 font-semibold';
+                        checkBtn.disabled = true;
+                        inputEl.disabled = true;
+                        inputEl.value = correctAnswer; // Fill in correct answer
+                        
+                        // Move to next step
+                        setTimeout(() => unlockNextStep(stepKey), 1000); // New logic
+                    }
+                }
+            }
+            
+            /**
+             * Displays the final summary table.
+             */
+            function showSummary() {
+                // Hide all step sections
+                stepElements.forEach(el => el.style.display = 'none');
+                // Show summary
+                summaryElement.style.display = 'block';
+                
+                const formatInput = (val, key) => (val === undefined) ? 'N/A' : (key === 'icb' ? formatPercent(val / 100) : formatCurrency(val));
+                const formatCorrect = (val, key) => (key === 'icb' ? formatPercent(val / 100) : formatCurrency(val));
+
+                document.getElementById('summary-pmt1-correct').textContent = formatCorrect(correctAnswers.pmt1, 'pmt1');
+                document.getElementById('summary-pmt1-1').textContent = formatInput(userInputs.pmt1[0], 'pmt1');
+                document.getElementById('summary-pmt1-2').textContent = formatInput(userInputs.pmt1[1], 'pmt1');
+
+                document.getElementById('summary-pmt2-correct').textContent = formatCorrect(correctAnswers.pmt2, 'pmt2');
+                document.getElementById('summary-pmt2-1').textContent = formatInput(userInputs.pmt2[0], 'pmt2');
+                document.getElementById('summary-pmt2-2').textContent = formatInput(userInputs.pmt2[1], 'pmt2');
+
+                document.getElementById('summary-olb1-correct').textContent = formatCorrect(correctAnswers.olb1, 'olb1');
+                document.getElementById('summary-olb1-1').textContent = formatInput(userInputs.olb1[0], 'olb1');
+                document.getElementById('summary-olb1-2').textContent = formatInput(userInputs.olb1[1], 'olb1');
+
+                document.getElementById('summary-olb2-correct').textContent = formatCorrect(correctAnswers.olb2, 'olb2');
+                document.getElementById('summary-olb2-1').textContent = formatInput(userInputs.olb2[0], 'olb2');
+                document.getElementById('summary-olb2-2').textContent = formatInput(userInputs.olb2[1], 'olb2');
+
+                document.getElementById('summary-icb-correct').textContent = formatCorrect(correctAnswers.icb, 'icb');
+                document.getElementById('summary-icb-1').textContent = formatInput(userInputs.icb[0], 'icb');
+                document.getElementById('summary-icb-2').textContent = formatInput(userInputs.icb[1], 'icb');
+
+                // Add styling for correct/incorrect
+                ['pmt1', 'pmt2', 'olb1', 'olb2', 'icb'].forEach(key => {
+                    const el1 = document.getElementById(`summary-${key}-1`);
+                    const el2 = document.getElementById(`summary-${key}-2`);
+                    if (results[key]) {
+                        if (attemptCounts[key] === 1) el1.classList.add('text-green-600', 'font-semibold');
+                    if (attemptCounts[key] === 2) el2.classList.add('text-green-600', 'font-semibold');
+                    } else {
+                        if (userInputs[key][0] !== undefined) el1.classList.add('text-red-600');
+                        if (userInputs[key][1] !== undefined) el2.classList.add('text-red-600');
+                    }
+                });
+
+                // Generate and send log data
+                const logEntry = {
+                    timestamp: new Date().toISOString(),
+                    parameters: {
+                        housePrice: problemParams.housePrice,
+                        annualRate: problemParams.annualRate,
+                        loanTermYears: problemParams.termYears,
+                        ltv1: problemParams.ltv1,
+                        ltv2: problemParams.ltv2,
+                        repaymentYear: problemParams.repayYear,
+                        pmiAnnualRate: problemParams.pmiAnnualRate,
+                        pmiMonthly: problemParams.pmiMonthly,
+                        loanAmount1: problemParams.loanAmount1,
+                        loanAmount2: problemParams.loanAmount2,
+                        nper: problemParams.nper,
+                        repayMonths: problemParams.repayMonths
+                    },
+                    correctAnswers: correctAnswers,
+                    userInputs: userInputs,
+                    results: results
+                };
+                
+                logDataToSheet(logEntry);
+            }
+
+            /**
+             * Generates and displays the JSON log data.
+             */
+            function logDataToSheet(logEntry) {
+                if (googleAppsScriptUrl === 'PASTE_YOUR_WEB_APP_URL_HERE' || !googleAppsScriptUrl) {
+                    console.warn('Google Apps Script URL not set. Skipping data logging.');
+                    return;
+                }
+
+                try {
+                    fetch(googleAppsScriptUrl, {
+                        method: 'POST',
+                        mode: 'no-cors', // Use no-cors to avoid CORS issues with simple deployments
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(logEntry)
+                    });
+                } catch (error) {
+                    console.error('Error logging data to Google Sheet:', error);
+                }
+            }
+
+
+            // --- INITIALIZATION ---
+            
+            // Add event listeners to check buttons
+            checkButtons[0].addEventListener('click', () => checkAnswer('pmt1', 2));
+            checkButtons[1].addEventListener('click', () => checkAnswer('pmt2', 2));
+            checkButtons[2].addEventListener('click', () => checkAnswer('olb1', 5));
+            checkButtons[3].addEventListener('click', () => checkAnswer('olb2', 5));
+            checkButtons[4].addEventListener('click', () => checkAnswer('icb', 0.1));
+
+            // Generate the first problem on load
+            generateNewProblem();
+        });
+    </script>
+</body>
+</html>
+
