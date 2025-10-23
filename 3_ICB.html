@@ -42,6 +42,12 @@
             Incremental Cost of Borrowing
         </h1>
 
+        <!-- Codeword Input -->
+        <div class="mb-4">
+            <label for="input-codeword" class="block text-sm font-medium text-gray-700 mb-1">Codeword:</label>
+            <input type="text" id="input-codeword" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Enter your codeword">
+        </div>
+
         <!-- Problem Setup Section -->
         <div id="problem-setup" class="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
             <h2 class="text-xl font-semibold text-gray-700 mb-4">Problem Parameters</h2>
@@ -439,7 +445,7 @@
                 // 4. Update UI
                 document.getElementById('param-house-price').textContent = formatCurrency(housePrice);
                 document.getElementById('param-rate').textContent = formatPercent(annualRate);
-                document.getElementById('param-term').textContent = `${termYears} Years (${nper} months)`;
+                document.getElementById('param-term').textContent = `${termYears} Years (${nper} months, full amortization)`;
                 document.getElementById('param-repay-year').textContent = `${repayYear} (${repayMonths} months)`;
                 
                 document.getElementById('param-loan-1').textContent = formatCurrency(loanAmount1);
@@ -611,9 +617,13 @@
                     }
                 });
 
+                // Get codeword
+                const codeword = document.getElementById('input-codeword').value || 'N/A';
+
                 // Generate and send log data
                 const logEntry = {
                     timestamp: new Date().toISOString(),
+                    codeword: codeword,
                     parameters: {
                         housePrice: problemParams.housePrice,
                         annualRate: problemParams.annualRate,
@@ -675,4 +685,5 @@
     </script>
 </body>
 </html>
+
 
