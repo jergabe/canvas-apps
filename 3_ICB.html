@@ -237,7 +237,7 @@
             // 6. In "Who has access", select "Anyone".
             // 7. Click "Deploy" and **Authorize** the script.
             // 8. Copy the "Web app URL" and paste it below.
-            const googleAppsScriptUrl = 'PASTE_YOUR_WEB_APP_URL_HERE';
+            const googleAppsScriptUrl = 'https://script.google.com/macros/s/AKfycbwr1Ls8SUcGOJbpo6p_LkQBSbroGEBsjhwpMxVJav5SXikWbL5tsqsZcp3UO9e3P1Kl/exec';
             
             // --- STATE VARIABLES ---
             let problemParams = {};
@@ -650,7 +650,7 @@
              * Generates and displays the JSON log data.
              */
             function logDataToSheet(logEntry) {
-                if (googleAppsScriptUrl === 'https://script.google.com/macros/s/AKfycbwr1Ls8SUcGOJbpo6p_LkQBSbroGEBsjhwpMxVJav5SXikWbL5tsqsZcp3UO9e3P1Kl/exec' || !googleAppsScriptUrl) {
+                if (googleAppsScriptUrl === 'PASTE_YOUR_WEB_APP_URL_HERE' || !googleAppsScriptUrl) {
                     console.warn('Google Apps Script URL not set. Skipping data logging.');
                     return;
                 }
@@ -658,14 +658,25 @@
                 try {
                     fetch(googleAppsScriptUrl, {
                         method: 'POST',
-                        mode: 'no-cors', // Use no-cors to avoid CORS issues with simple deployments
+                        // mode: 'no-cors', // Removed for better error handling and correct Content-Type
                         headers: {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify(logEntry)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            console.log('Data logged successfully to Google Sheet.');
+                        } else {
+                            console.error('Error logging to Google Sheet (from backend):', data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error sending data to Google Sheet (network/fetch):', error);
                     });
                 } catch (error) {
-                    console.error('Error logging data to Google Sheet:', error);
+                    console.error('Error logging data to Google Sheet (local try/catch):', error);
                 }
             }
 
@@ -685,5 +696,7 @@
     </script>
 </body>
 </html>
+
+
 
 
