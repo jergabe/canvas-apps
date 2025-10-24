@@ -616,8 +616,7 @@
                         if (userInputs[key][1] !== undefined) el2.classList.add('text-red-600');
                     }
                 });
-
-                // Get codeword
+                <!-- Get codeword -->
                 const codeword = document.getElementById('input-codeword').value || 'N/A';
 
                 // Generate and send log data
@@ -629,7 +628,8 @@
                         annualRate: problemParams.annualRate,
                         loanTermYears: problemParams.termYears,
                         ltv1: problemParams.ltv1,
-                        ltv2: problemParams.ltv2,
+                        // ltv2: problemParams.ltv2, // OLD
+                        ltv2Percent: problemParams.ltv2Percent, // NEW: Send the percentage directly (e.g., 85)
                         repaymentYear: problemParams.repayYear,
                         pmiAnnualRate: problemParams.pmiAnnualRate,
                         pmiMonthly: problemParams.pmiMonthly,
@@ -658,23 +658,19 @@
                 try {
                     fetch(googleAppsScriptUrl, {
                         method: 'POST',
-                        // mode: 'no-cors', // Removed for better error handling and correct Content-Type
+                        mode: 'no-cors', // <-- RE-ADD THIS to bypass the CORS preflight check
                         headers: {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify(logEntry)
                     })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            console.log('Data logged successfully to Google Sheet.');
-                        } else {
-                            console.error('Error logging to Google Sheet (from backend):', data.message);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error sending data to Google Sheet (network/fetch):', error);
-                    });
+                    // REMOVED the .then() and .catch() blocks.
+                    // With 'no-cors', the response is "opaque" and cannot be read,
+                    // so we "fire-and-forget" instead.
+                    
+                    // We can log that we *attempted* to send it.
+                    console.log('Attempting to log data to Google Sheet (fire-and-forget mode)...');
+                    
                 } catch (error) {
                     console.error('Error logging data to Google Sheet (local try/catch):', error);
                 }
@@ -696,6 +692,8 @@
     </script>
 </body>
 </html>
+
+
 
 
 
