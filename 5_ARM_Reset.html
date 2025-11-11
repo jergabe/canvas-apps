@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARM Reset Rate Practice</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .correct {
+            border-color: #22c55e; /* green-500 */
+        }
+        .incorrect {
+            border-color: #ef4444; /* red-500 */
+        }
+        input:disabled {
+            background-color: #f3f4f6; /* gray-100 */
+            color: #6b7280; /* gray-500 */
+        }
+        .hint {
+            color: #6b7280; /* gray-500 */
+        }
+        .explanation {
+            background-color: #fefce8; /* yellow-50 */
+            border-color: #fde047; /* yellow-300 */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-900 p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto bg-white p-6 md:p-8 rounded-2xl shadow-lg">
+
+        <header class="mb-6 border-b pb-6">
+            <h1 class="text-3xl font-bold text-blue-700">ARM Reset Rate Practice</h1>
+            <p class="text-lg text-gray-600 mt-2">Practice calculating the interest rate for an Adjustable Rate Mortgage (ARM) on its reset dates.</p>
+        </header>
+
+        <!-- User Input Section -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+                <label for="codeword" class="block text-sm font-medium text-gray-700 mb-1">Enter Your Codeword</label>
+                <input type="text" id="codeword" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., BlueHeron">
+            </div>
+            <!-- The Google Sheet Script URL input has been removed and hardcoded below -->
+        </div>
+
+        <!-- Start Button -->
+        <div class="text-center mb-8">
+            <button id="start-problem" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-10 rounded-lg shadow-md transition-all duration-300 ease-in-out transform hover:scale-105">
+                Start New Problem
+            </button>
+        </div>
+
+        <!-- Main Problem Area (Hidden by default) -->
+        <main id="problem-area" class="hidden">
+            
+            <!-- Problem Details -->
+            <section id="problem-details" class="mb-8 p-6 bg-blue-50 border-2 border-blue-200 rounded-xl">
+                <h2 class="text-2xl font-semibold text-blue-800 mb-4">Your Loan Scenario</h2>
+                <div id="problem-text" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- JS will populate this -->
+                </div>
+            </section>
+
+            <!-- Index Rate Table -->
+            <section id="index-table-section" class="mb-8">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Simulated Future Index Rates</h2>
+                <div class="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Month</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">1-Year Treasury</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">6-Month Treasury</th>
+                            </tr>
+                        </thead>
+                        <tbody id="index-table-body" class="bg-white divide-y divide-gray-200">
+                            <!-- JS will populate this -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Answer Section -->
+            <section id="answer-section" class="mb-8">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Calculate the New Interest Rate</h2>
+                <p class="text-gray-600 mb-6">For each reset date, calculate the new interest rate. You have two attempts per reset. All rates are percentages (e.g., enter 5.25 for 5.25%).</p>
+                <div id="answer-blocks" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- JS will populate this -->
+                </div>
+            </section>
+
+            <!-- Submission Section -->
+            <section id="submission-section" class="text-center border-t pt-8 mt-8">
+                <button id="submit-results" class="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-10 rounded-lg shadow-md transition-all duration-300 ease-in-out transform hover:scale-105" disabled>
+                    Submit Results to Google Sheet
+                </button>
+                <p id="submit-status" class="mt-4 text-sm"></p>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Main Application Script -->
+    <script type="module">
+        // --- STATE VARIABLES ---
+        let currentProblem = {};
+        let answerAttempts = []; // Stores state for each answer block
+        const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbwU8JEgUiKGjRgBXTyjlZoujQAYx4GBfL6hdkgqquVmX8J7PxSynHa3v38b94KCV_Ae/exec';
+
+        // --- DOM ELEMENTS ---
+        const startButton = document.getElementById('start-problem');
+        const problemArea = document.getElementById('problem-area');
+        const problemText = document.getElementById('problem-text');
+        const indexTableBody = document.getElementById('index-table-body');
+        const answerBlocks = document.getElementById('answer-blocks');
+        const submitButton = document.getElementById('submit-results');
+        const submitStatus = document.getElementById('submit-status');
+        const codewordInput = document.getElementById('codeword');
+
+        // --- EVENT LISTENERS ---
+        startButton.addEventListener('click', startNewProblem);
+        submitButton.addEventListener('click', submitResults);
+
+        // --- HELPER FUNCTIONS ---
+
+        /**
+         * Generates a random float within a range, rounded to a specified precision.
+         * @param {number} min - Minimum value
+         * @param {number} max - Maximum value
+         * @param {number} precision - Number of decimal places
+         * @returns {number}
+         */
+        function randFloat(min, max, precision = 3) {
+            const val = Math.random() * (max - min) + min;
+            return parseFloat(val.toFixed(precision));
+        }
+
+        /**
+         * Formats a number as a percentage string.
+         * @param {number} num - The number to format
+         * @returns {string}
+         */
+        function formatPercent(num) {
+            return `${num.toFixed(3)}%`;
+        }
+        
+        /**
+         * Gets the index rate for a specific month from the problem's table.
+         * @param {number} month - The month number (1, 7, 13, etc.)
+         * @param {string} indexType - '1-Year Treasury' or '6-Month Treasury'
+         * @returns {number} - The rate
+         */
+        function getIndexForMonth(month, indexType) {
+            const rateData = currentProblem.simulatedIndexRates.find(r => r.month === month);
+            if (indexType === '1-Year Treasury') {
+                return rateData.oneYear;
+            } else {
+                return rateData.sixMonth;
+            }
+        }
+
+        /**
+         * Calculates all correct answers for the current problem.
+         * @returns {Array<number>} - An array of the 4 correct reset rates.
+         */
+        function calculateCorrectAnswers() {
+            const { startRate, margin, periodicCap, lifeCap, adjustmentPeriod } = currentProblem.armTerms;
+            const answers = [];
+            let previousRate = startRate;
+            let resetMonths = [];
+
+            if (adjustmentPeriod === "1 Year") {
+                resetMonths = [13, 25, 37, 49]; // Start of 2nd, 3rd, 4th, 5th years
+            } else { // 6 Month
+                resetMonths = [7, 13, 19, 25]; // Start of months 7, 13, 19, 25
+            }
+
+            for (const month of resetMonths) {
+                const indexRate = getIndexForMonth(month, currentProblem.armTerms.index);
+                
+                // 1. Calculate Fully Indexed Rate (FIR)
+                const fullyIndexedRate = indexRate + margin;
+
+                // 2. Check Periodic Cap
+                const periodicCapFloor = previousRate - periodicCap;
+                const periodicCapCeiling = previousRate + periodicCap;
+                
+                // 3. Check Life Cap
+                const lifeCapFloor = startRate - lifeCap;
+                const lifeCapCeiling = startRate + lifeCap;
+
+                // Determine the new rate
+                let newRate = fullyIndexedRate;
+
+                // Apply periodic cap
+                if (newRate > periodicCapCeiling) newRate = periodicCapCeiling;
+                if (newRate < periodicCapFloor) newRate = periodicCapFloor;
+
+                // Apply life cap
+                if (newRate > lifeCapCeiling) newRate = lifeCapCeiling;
+                if (newRate < lifeCapFloor) newRate = lifeCapFloor;
+                
+                const finalRate = parseFloat(newRate.toFixed(3));
+                answers.push(finalRate);
+                
+                // The new rate becomes the previous rate for the next calculation
+                previousRate = finalRate;
+            }
+            return answers;
+        }
+
+
+        // --- UI RENDERING FUNCTIONS ---
+        
+        /**
+         * Renders the loan scenario box.
+         */
+        function renderProblemDetails() {
+            const { armTerms } = currentProblem;
+            const details = [
+                { label: 'Adj. Period', value: armTerms.adjustmentPeriod },
+                { label: 'Start Rate', value: formatPercent(armTerms.startRate) },
+                { label: 'Index', value: armTerms.index },
+                { label: 'Margin', value: formatPercent(armTerms.margin) },
+                { label: 'Periodic Cap', value: `±${formatPercent(armTerms.periodicCap)}` },
+                { label: 'Lifetime Cap', value: `±${formatPercent(armTerms.lifeCap)} (from Start Rate)` }
+            ];
+            
+            problemText.innerHTML = details.map(detail => `
+                <div class="p-4 bg-white rounded-lg shadow-sm border border-gray-200">
+                    <div class="text-sm font-medium text-gray-500">${detail.label}</div>
+                    <div class="text-xl font-semibold text-blue-700">${detail.value}</div>
+                </div>
+            `).join('');
+        }
+
+        /**
+         * Renders the simulated index rate table.
+         */
+        function renderIndexTable() {
+            indexTableBody.innerHTML = currentProblem.simulatedIndexRates.map(rate => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${rate.month}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${formatPercent(rate.oneYear)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${formatPercent(rate.sixMonth)}</td>
+                </tr>
+            `).join('');
+        }
+
+        /**
+         * Renders the 4 answer blocks.
+         */
+        function renderAnswerBlocks() {
+            answerBlocks.innerHTML = ''; // Clear previous blocks
+            for (let i = 0; i < 4; i++) {
+                const block = document.createElement('div');
+                block.className = 'p-5 bg-white rounded-lg shadow-md border border-gray-200';
+                block.innerHTML = `
+                    <h3 class="text-lg font-semibold text-gray-800 mb-3">Reset ${i + 1}</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <label for="answer-${i}" class="block text-sm font-medium text-gray-600">New Rate (%):</label>
+                            <input type="number" id="answer-${i}" class="mt-1 w-full p-2 border border-gray-300 rounded-lg shadow-sm" step="0.001">
+                        </div>
+                        <button id="check-${i}" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200">
+                            Check Answer
+                        </button>
+                        <div id="feedback-${i}" class="text-sm mt-2"></div>
+                    </div>
+                `;
+                answerBlocks.appendChild(block);
+                
+                // Add event listener for the check button
+                document.getElementById(`check-${i}`).addEventListener('click', () => checkAnswer(i));
+            }
+        }
+        
+        /**
+         * Checks the student's answer for a specific reset.
+         * @param {number} resetIndex - The index of the reset (0-3)
+         */
+        function checkAnswer(resetIndex) {
+            const attempt = answerAttempts[resetIndex];
+            if (attempt.isLocked) return; // Already answered correctly
+
+            const inputEl = document.getElementById(`answer-${resetIndex}`);
+            const feedbackEl = document.getElementById(`feedback-${resetIndex}`);
+            const checkButton = document.getElementById(`check-${resetIndex}`);
+            
+            let studentAnswer;
+            try {
+                studentAnswer = parseFloat(inputEl.value);
+                if (isNaN(studentAnswer)) throw new Error("Not a number");
+            } catch (e) {
+                feedbackEl.innerHTML = `<span class="font-medium text-red-600">Invalid input. Please enter a number.</span>`;
+                return;
+            }
+            
+            // Store attempts
+            if (attempt.attempts === 0) {
+                attempt.attempt1_Input = studentAnswer;
+            } else {
+                attempt.attempt2_Input = studentAnswer;
+            }
+            attempt.attempts++;
+
+            const correctAnswer = attempt.correctAnswer;
+            
+            // Check if correct (rounding to 3 decimal places)
+            if (studentAnswer.toFixed(3) === correctAnswer.toFixed(3)) {
+                attempt.isLocked = true;
+                attempt.wasCorrect = true;
+                inputEl.disabled = true;
+                inputEl.value = correctAnswer.toFixed(3); // Set to exact answer
+                inputEl.classList.add('correct');
+                inputEl.classList.remove('incorrect');
+                checkButton.disabled = true;
+                checkButton.textContent = 'Correct!';
+                checkButton.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+                checkButton.classList.add('bg-green-600', 'cursor-not-allowed');
+                feedbackEl.innerHTML = `<span class="font-medium text-green-700">Correct! The new rate is ${formatPercent(correctAnswer)}.</span>`;
+            } else {
+                // Incorrect
+                inputEl.classList.add('incorrect');
+                if (attempt.attempts === 1) {
+                    // First incorrect attempt: Provide hint
+                    const { adjustmentPeriod } = currentProblem.armTerms;
+                    const hintMonth = (adjustmentPeriod === "1 Year") 
+                        ? [13, 25, 37, 49][resetIndex] 
+                        : [7, 13, 19, 25][resetIndex];
+                    
+                    feedbackEl.innerHTML = `
+                        <span class="font-medium text-red-600">Not quite. Try again.</span><br>
+                        <span class="hint"><b>Hint:</b> This reset occurs at the beginning of <b>Month ${hintMonth}</b>. Be sure to use the correct index and check all caps.</span>
+                    `;
+                } else {
+                    // Second incorrect attempt: Lock and show explanation
+                    attempt.isLocked = true;
+                    inputEl.disabled = true;
+                    inputEl.value = studentAnswer; // Keep their wrong answer
+                    checkButton.disabled = true;
+                    checkButton.textContent = 'Final Attempt';
+                    checkButton.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+                    checkButton.classList.add('bg-red-600', 'cursor-not-allowed');
+                    
+                    // Detailed explanation
+                    const { armTerms } = currentProblem;
+                    const prevRate = (resetIndex === 0) 
+                        ? armTerms.startRate 
+                        : answerAttempts[resetIndex - 1].correctAnswer;
+                    
+                    const resetMonth = (armTerms.adjustmentPeriod === "1 Year") 
+                        ? [13, 25, 37, 49][resetIndex] 
+                        : [7, 13, 19, 25][resetIndex];
+                    
+                    const indexRate = getIndexForMonth(resetMonth, armTerms.index);
+                    const fir = indexRate + armTerms.margin;
+                    const periodicCeiling = prevRate + armTerms.periodicCap;
+                    const periodicFloor = prevRate - armTerms.periodicCap;
+                    const lifeCeiling = armTerms.startRate + armTerms.lifeCap;
+                    const lifeFloor = armTerms.startRate - armTerms.lifeCap;
+                    
+                    feedbackEl.innerHTML = `
+                        <span class="font-medium text-red-700">That's incorrect. The correct answer is <b>${formatPercent(correctAnswer)}</b>.</span>
+                        <div class="explanation border border-yellow-300 bg-yellow-50 p-3 mt-3 rounded-md text-sm">
+                            <b>Explanation:</b>
+                            <ul class="list-disc list-inside ml-1 mt-1 space-y-1">
+                                <li><b>Index Rate:</b> ${formatPercent(indexRate)} (from Month ${resetMonth})</li>
+                                <li><b>Margin:</b> + ${formatPercent(armTerms.margin)}</li>
+                                <li><b>Fully Indexed Rate (FIR):</b> = ${formatPercent(fir)}</li>
+                                <li><b>Periodic Cap:</b> (prev. rate ${formatPercent(prevRate)})
+                                    <ul>
+                                        <li class="ml-4">Ceiling: ${formatPercent(periodicCeiling)}</li>
+                                        <li class="ml-4">Floor: ${formatPercent(periodicFloor)}</li>
+                                    </ul>
+                                </li>
+                                <li><b>Lifetime Cap:</b> (start rate ${formatPercent(armTerms.startRate)})
+                                    <ul>
+                                        <li class="ml-4">Ceiling: ${formatPercent(lifeCeiling)}</li>
+                                        <li class="ml-4">Floor: ${formatPercent(lifeFloor)}</li>
+                                    </ul>
+                                </li>
+                                <li><b>Final Rate:</b> The lowest of (FIR, Periodic Ceiling, Life Ceiling) is <b>${formatPercent(correctAnswer)}</b>.</li>
+                            </ul>
+                        </div>
+                    `;
+                }
+            }
+            
+            // Check if all answers are locked
+            if (answerAttempts.every(a => a.isLocked)) {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Submit Final Results';
+            }
+        }
+
+
+        // --- LOGIC FUNCTIONS ---
+
+        /**
+         * Generates a new random problem.
+         */
+        function generateProblem() {
+            const isOneYearARM = Math.random() < 0.5;
+            const adjustmentPeriod = isOneYearARM ? "1 Year" : "6 Month";
+            const index = isOneYearARM ? "1-Year Treasury" : "6-Month Treasury";
+            
+            const armTerms = {
+                adjustmentPeriod: adjustmentPeriod,
+                startRate: randFloat(2.5, 5.0),
+                index: index,
+                margin: randFloat(1.75, 3.0),
+                periodicCap: (isOneYearARM ? randFloat(1.5, 2.5, 1) : randFloat(0.75, 1.5, 1)),
+                lifeCap: randFloat(5.0, 7.0, 1)
+            };
+            
+            const simulatedIndexRates = generateIndexTable(armTerms);
+            
+            return { armTerms, simulatedIndexRates };
+        }
+
+        /**
+         * Generates the table of simulated index rates.
+         * Ensures at least one cap is triggered.
+         * @param {object} armTerms - The terms of the ARM
+         * @returns {Array<object>} - Table of index rates
+         */
+        function generateIndexTable(armTerms) {
+            const { startRate, margin, periodicCap, lifeCap } = armTerms;
+            const rates = [];
+            let month = 1;
+            for (let i = 0; i < 9; i++) {
+                rates.push({
+                    month: month,
+                    oneYear: randFloat(1.0, 5.5),
+                    sixMonth: randFloat(0.5, 5.0)
+                });
+                month += 6;
+            }
+            
+            // Ensure at least one cap is triggered
+            const capTriggerReset = Math.floor(Math.random() * 4); // 0, 1, 2, or 3
+            const resetMonths = (armTerms.adjustmentPeriod === "1 Year") ? [13, 25, 37, 49] : [7, 13, 19, 25];
+            const triggerMonth = resetMonths[capTriggerReset];
+            
+            // Calculate what the "previous rate" would be at that reset
+            let prevRate = startRate;
+            for(let i = 0; i < capTriggerReset; i++) {
+                const rMonth = resetMonths[i];
+                const rIndex = (armTerms.index === "1-Year Treasury") 
+                    ? rates.find(r => r.month === rMonth).oneYear 
+                    : rates.find(r => r.month === rMonth).sixMonth;
+                
+                const fir = rIndex + margin;
+                const pCeil = prevRate + periodicCap;
+                const lCeil = startRate + lifeCap;
+                
+                prevRate = Math.min(fir, pCeil, lCeil);
+            }
+            
+            // Now, force the trigger index rate to be high
+            // We'll target the periodic cap, as it's usually lower than the life cap
+            const targetRate = prevRate + periodicCap;
+            // The index needed to hit this target is (targetRate - margin)
+            // We'll add a bit more to be sure it's a "cap"
+            const triggerIndexRate = (targetRate - margin) + randFloat(0.5, 2.0); 
+
+            // Find the rate object to update
+            const rateToUpdate = rates.find(r => r.month === triggerMonth);
+            if (armTerms.index === "1-Year Treasury") {
+                rateToUpdate.oneYear = triggerIndexRate;
+            } else {
+                rateToUpdate.sixMonth = triggerIndexRate;
+            }
+
+            return rates;
+        }
+
+        /**
+         * Main function to start a new problem.
+         */
+        function startNewProblem() {
+            currentProblem = generateProblem();
+            const correctAnswers = calculateCorrectAnswers();
+            
+            // Reset answer state
+            answerAttempts = correctAnswers.map((answer, i) => ({
+                reset: `Reset ${i + 1}`,
+                attempts: 0,
+                attempt1_Input: null,
+                attempt2_Input: null,
+                correctAnswer: answer,
+                isLocked: false,
+                wasCorrect: false
+            }));
+
+            // Render UI
+            renderProblemDetails();
+            renderIndexTable();
+            renderAnswerBlocks();
+
+            // Show problem area
+            problemArea.classList.remove('hidden');
+            
+            // Reset submission button
+            submitButton.disabled = true;
+            submitButton.textContent = 'Complete All Answers to Submit';
+            submitStatus.textContent = '';
+            submitStatus.classList.remove('text-green-600', 'text-red-600');
+        }
+
+        /**
+         * Submits the final results to the Google Sheet.
+         */
+        async function submitResults() {
+            const codeword = codewordInput.value;
+            if (!codeword) {
+                alert('Please enter a codeword before submitting.');
+                return;
+            }
+            
+            submitButton.disabled = true;
+            submitButton.textContent = 'Submitting...';
+            submitStatus.textContent = 'Submitting results...';
+            submitStatus.classList.remove('text-green-600', 'text-red-600');
+
+            const overallSuccess = answerAttempts.every(a => a.wasCorrect);
+            
+            const data = {
+                timestamp: new Date().toISOString(),
+                codeword: codeword,
+                armTerms: currentProblem.armTerms,
+                simulatedIndexRates: currentProblem.simulatedIndexRates,
+                results: answerAttempts.map(a => ({
+                    reset: a.reset,
+                    attempt1_Input: a.attempt1_Input,
+                    attempt2_Input: a.attempt2_Input,
+                    correctAnswer: a.correctAnswer,
+                    wasCorrect: a.wasCorrect
+                })),
+                overallSuccess: overallSuccess
+            };
+
+            console.log("Data sent to Google Sheets:", JSON.stringify(data, null, 2));
+
+            try {
+                const response = await fetch(GOOGLE_SHEET_URL, {
+                    method: 'POST',
+                    mode: 'cors', // This is required for cross-origin requests
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) {
+                    // Try to get more info from the response if possible
+                    let errorInfo = `HTTP status ${response.status}`;
+                    try {
+                        const errorData = await response.json();
+                        errorInfo = errorData.message || JSON.stringify(errorData);
+                    } catch (e) { /* ignore if response isn't json */ }
+                    
+                    throw new Error(`Network response was not ok. ${errorInfo}`);
+                }
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    submitStatus.textContent = 'Results successfully submitted!';
+                    submitStatus.classList.add('text-green-600');
+                    submitButton.textContent = 'Submitted!';
+                    // Disable the entire app until a new problem is started
+                    document.querySelectorAll('#problem-area input, #problem-area button').forEach(el => el.disabled = true);
+                } else {
+                    throw new Error(result.message || 'Unknown error from Google Script.');
+                }
+
+            } catch (error) {
+                console.error('Error submitting to Google Sheets:', error);
+                submitStatus.textContent = `Error: ${error.message}. Please check console.`;
+                submitStatus.classList.add('text-red-600');
+                submitButton.disabled = false; // Re-enable to allow retry
+                submitButton.textContent = 'Try Submitting Again';
+            }
+        }
+
+    </script>
+</body>
+</html>
