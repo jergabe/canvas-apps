@@ -183,6 +183,9 @@
     <div id="completion-section" class="section hidden" style="text-align: center;">
         <h2 style="color:var(--accent)">Exercise Complete!</h2>
         <p>Your results have been recorded.</p>
+        <div id="loading-indicator" style="display:none; color: #666; margin: 10px 0;">
+            Submitting data to Google Sheets...
+        </div>
         <button onclick="location.reload()">New Scenario</button>
     </div>
 
@@ -190,7 +193,7 @@
 
 <script>
     // --- CONFIGURATION ---
-    // PASTE YOUR DEPLOYED GOOGLE APPS SCRIPT URL HERE
+    // ENSURE THIS URL IS FROM YOUR LATEST DEPLOYMENT
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzE3EES0ilQ8iLQPXx12DABB8J5nq6klExE9sKhlRBq-7QvDO4E8tz0etY2PV28QorL/exec"; 
 
     // --- STATE MANAGEMENT ---
@@ -393,6 +396,7 @@
     // --- DATA SUBMISSION (UPDATED TO POST) ---
     function finishGame() {
         document.getElementById('completion-section').classList.remove('hidden');
+        document.getElementById('loading-indicator').style.display = 'block';
         
         const payload = {
             codeword: state.codeword,
@@ -410,18 +414,29 @@
 
         if(GOOGLE_SCRIPT_URL.includes("PLACEHOLDER")) {
             console.log("Data ready to send (Script URL not set):", payload);
+            alert("Script URL not set. Data not sent.");
         } else {
-            // Using POST with text/plain to avoid CORS preflight issues on Google Apps Script
+            console.log("Attempting to send payload to:", GOOGLE_SCRIPT_URL);
+            console.log("Payload:", payload);
+
             fetch(GOOGLE_SCRIPT_URL, {
                 method: "POST",
-                mode: "no-cors",
+                mode: "no-cors", // Necessary for Google Scripts
                 headers: {
-                    "Content-Type": "text/plain" 
+                    "Content-Type": "text/plain" // Prevents CORS preflight which GAS hates
                 },
                 body: JSON.stringify(payload)
             }).then(() => {
-                console.log("Data submitted successfully");
-            }).catch(e => console.error("Error sending data", e));
+                console.log("Data submission request sent.");
+                document.getElementById('loading-indicator').innerText = "Data submitted.";
+                document.getElementById('loading-indicator').style.color = "green";
+                // Note: with no-cors, we can't see the response text, but if it doesn't throw, it likely went through IF the URL is correct.
+            }).catch(e => {
+                console.error("Error sending data", e);
+                document.getElementById('loading-indicator').innerText = "Error submitting data. Check console.";
+                document.getElementById('loading-indicator').style.color = "red";
+                alert("There was an error sending the data. Please check the console for details.");
+            });
         }
     }
 
