@@ -137,7 +137,7 @@
     <!-- Question 1: Price -->
     <div id="q1-section" class="section hidden">
         <label>1. Estimate the Property Price ($):</label>
-        <input type="number" id="ans-price" placeholder="NOI / Cap Rate">
+        <input type="number" id="ans-price" placeholder="Enter amount">
         <button onclick="checkStep(1)">Check Price</button>
         <div id="feedback-1" class="feedback"></div>
     </div>
@@ -145,7 +145,7 @@
     <!-- Question 2: LTV Loan -->
     <div id="q2-section" class="section hidden">
         <label>2. Calculate Max Loan based on LTV ($):</label>
-        <input type="number" id="ans-ltv-loan" placeholder="Price * Max LTV">
+        <input type="number" id="ans-ltv-loan" placeholder="Enter amount">
         <button onclick="checkStep(2)">Check LTV Loan</button>
         <div id="feedback-2" class="feedback"></div>
     </div>
@@ -153,7 +153,7 @@
     <!-- Question 3: DSCR Max Payment -->
     <div id="q3-section" class="section hidden">
         <label>3. Calculate Max Allowable MONTHLY Payment ($):</label>
-        <input type="number" id="ans-dscr-pmt" placeholder="(NOI / DSCR) / 12">
+        <input type="number" id="ans-dscr-pmt" placeholder="Enter amount">
         <button onclick="checkStep(3)">Check Payment</button>
         <div id="feedback-3" class="feedback"></div>
     </div>
@@ -162,7 +162,7 @@
     <div id="q4-section" class="section hidden">
         <label>4. Calculate Max Loan based on DSCR ($):</label>
         <p style="font-size:0.9em; color:#666;">(Use the PV formula with your Max Monthly Payment)</p>
-        <input type="number" id="ans-dscr-loan" placeholder="PV of Max Payment">
+        <input type="number" id="ans-dscr-loan" placeholder="Enter amount">
         <button onclick="checkStep(4)">Check DSCR Loan</button>
         <div id="feedback-4" class="feedback"></div>
     </div>
@@ -190,7 +190,7 @@
 
 <script>
     // --- CONFIGURATION ---
-    // UPDATED WITH YOUR DEPLOYED GOOGLE APPS SCRIPT URL
+    // PASTE YOUR DEPLOYED GOOGLE APPS SCRIPT URL HERE
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzE3EES0ilQ8iLQPXx12DABB8J5nq6klExE9sKhlRBq-7QvDO4E8tz0etY2PV28QorL/exec"; 
 
     // --- STATE MANAGEMENT ---
@@ -232,9 +232,6 @@
 
     function generateScenario() {
         // PROBABILITY ENGINEERING
-        // We want DSCR loan to be smaller (binding) 65% of time.
-        // DSCR Loan < LTV Loan roughly when Cap Rate is LOW and Interest Rate is HIGH.
-        
         const forceDSCRBinding = Math.random() < 0.65;
         
         // 1. Generate NOI ($100k - $700k, step $10k)
@@ -243,14 +240,12 @@
         // 2. Set Parameters based on bias
         if (forceDSCRBinding) {
             // Bucket A: High Rate, Low Cap, High LTV, High DSCR Requirement
-            // This squeezes the DSCR loan down and pushes LTV loan up
             state.capRate = getRandomInt(40, 55) / 1000; // 4.0% - 5.5%
-            state.intRate = getRandomInt(14, 18) / 200;  // 7.0% - 9.0% (steps of 0.5%)
+            state.intRate = getRandomInt(14, 18) / 200;  // 7.0% - 9.0%
             state.ltvMax = getRandomInt(13, 15) * 0.05;  // 65% - 75%
             state.dscrMin = getRandomInt(27, 30) * 0.05; // 1.35 - 1.50
         } else {
             // Bucket B: Low Rate, High Cap, Low LTV, Low DSCR Requirement
-            // This squeezes LTV loan down and pushes DSCR loan up
             state.capRate = getRandomInt(55, 70) / 1000; // 5.5% - 7.0%
             state.intRate = getRandomInt(10, 13) / 200;  // 5.0% - 6.5%
             state.ltvMax = getRandomInt(10, 12) * 0.05;  // 50% - 60%
@@ -267,7 +262,6 @@
         // PV Calculation: PV(rate/12, nper, -pmt)
         const nper = 25 * 12; // 25 years
         const r = state.intRate / 12;
-        // PV Formula: Pmt * (1 - (1+r)^-n) / r
         const dscrLoan = monthlyPmt * (1 - Math.pow(1 + r, -nper)) / r;
 
         const winningLoan = Math.min(ltvLoan, dscrLoan);
@@ -296,12 +290,11 @@
         state.attempts[step]++;
         const feedbackEl = document.getElementById(`feedback-${step}`);
         feedbackEl.style.display = 'block';
-        feedbackEl.className = 'feedback'; // reset classes
+        feedbackEl.className = 'feedback'; 
 
         let isCorrect = false;
         let userVal, correctVal;
         
-        // Logic switch per step
         if (step === 1) {
             userVal = parseFloat(document.getElementById('ans-price').value);
             correctVal = state.correctValues.price;
@@ -324,12 +317,9 @@
             isCorrect = (userVal === correctVal);
         }
 
-        // Response Logic
         if (isCorrect) {
             feedbackEl.classList.add('success');
             feedbackEl.innerHTML = `<strong>Correct!</strong> Great job.`;
-            
-            // Lock input and show next section
             lockSection(step);
             if (step < 5) {
                 document.getElementById(`q${step+1}-section`).classList.remove('hidden');
@@ -338,14 +328,18 @@
             }
         } else {
             if (state.attempts[step] === 1) {
-                // First Fail: HINT
                 feedbackEl.classList.add('hint');
-                feedbackEl.innerHTML = getHint(step);
+                let specificHint = null;
+                if (step === 3) {
+                    const annualVal = state.correctValues.monthlyPmt * 12;
+                    if (isCloseEnough(userVal, annualVal)) {
+                        specificHint = "<strong>Hint:</strong> It looks like you calculated the Annual Debt Service. The question asks for the <strong>MONTHLY</strong> payment.";
+                    }
+                }
+                feedbackEl.innerHTML = specificHint || getHint(step);
             } else {
-                // Second Fail: WALKTHROUGH
                 feedbackEl.classList.add('error');
                 feedbackEl.innerHTML = getWalkthrough(step);
-                // Fill correct answer to allow progression
                 fillCorrectAnswer(step);
                 lockSection(step);
                 if (step < 5) {
@@ -358,30 +352,23 @@
     }
 
     function isCloseEnough(a, b) {
-        // Allow 1% tolerance due to rounding
-        if (!a) return false;
-        const diff = Math.abs(a - b);
-        const tolerance = b * 0.01; 
-        return diff <= tolerance;
+        if (!a && a !== 0) return false;
+        return Math.abs(a - b) <= 5;
     }
 
     function lockSection(step) {
-        // Disable inputs and button for this step
         const section = document.getElementById(`q${step}-section`);
         const inputs = section.querySelectorAll('input, select, button');
         inputs.forEach(el => el.disabled = true);
     }
 
     function fillCorrectAnswer(step) {
-        // Auto-fill the correct answer so they can see it for the next calc
         if (step === 1) document.getElementById('ans-price').value = state.correctValues.price.toFixed(2);
         if (step === 2) document.getElementById('ans-ltv-loan').value = state.correctValues.ltvLoan.toFixed(2);
         if (step === 3) document.getElementById('ans-dscr-pmt').value = state.correctValues.monthlyPmt.toFixed(2);
         if (step === 4) document.getElementById('ans-dscr-loan').value = state.correctValues.dscrLoan.toFixed(2);
         if (step === 5) document.getElementById('ans-decision').value = state.correctValues.winningType;
     }
-
-    // --- EDUCATIONAL CONTENT ---
 
     function getHint(step) {
         switch(step) {
@@ -403,12 +390,10 @@
         }
     }
 
-    // --- DATA SUBMISSION ---
-
+    // --- DATA SUBMISSION (UPDATED TO POST) ---
     function finishGame() {
         document.getElementById('completion-section').classList.remove('hidden');
         
-        // Prepare data payload
         const payload = {
             codeword: state.codeword,
             noi: state.noi,
@@ -420,22 +405,22 @@
             correctLTVLoan: state.correctValues.ltvLoan,
             correctDSCRLoan: state.correctValues.dscrLoan,
             winningType: state.correctValues.winningType,
-            attempts: JSON.stringify(state.attempts),
-            timestamp: new Date().toISOString()
+            attempts: JSON.stringify(state.attempts)
         };
 
-        // Send to Google Sheets (Fire and forget, or handle response)
-        // Using 'no-cors' mode which is standard for simple Google Script forms 
-        // Note: You won't get a readable JSON response in no-cors, but the sheet will update.
-        
-        const params = new URLSearchParams(payload);
-        
         if(GOOGLE_SCRIPT_URL.includes("PLACEHOLDER")) {
             console.log("Data ready to send (Script URL not set):", payload);
         } else {
-            fetch(GOOGLE_SCRIPT_URL + "?" + params.toString(), {
-                method: "GET",
-                mode: "no-cors"
+            // Using POST with text/plain to avoid CORS preflight issues on Google Apps Script
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: "POST",
+                mode: "no-cors",
+                headers: {
+                    "Content-Type": "text/plain" 
+                },
+                body: JSON.stringify(payload)
+            }).then(() => {
+                console.log("Data submitted successfully");
             }).catch(e => console.error("Error sending data", e));
         }
     }
