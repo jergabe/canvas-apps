@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mortgage Payment Calculator (2026)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 90%;
+            max-width: 680px;
+            max-height: 88vh;
+            overflow-y: auto;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2), 0 6px 20px 0 rgba(0,0,0,0.19);
+            animation-name: animatetop;
+            animation-duration: 0.4s;
+        }
+        @keyframes animatetop {
+            from { top: -300px; opacity: 0; }
+            to { top: 0; opacity: 1; }
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            line-height: 1;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .gif-frame {
+            width: 260px;
+            height: 260px;
+            object-fit: contain;
+        }
+        .scenario-card {
+            transition: all 0.3s ease-in-out;
+            background-color: #fff;
+        }
+        .scenario-card.correct {
+            background-color: #F0FDF4; /* light green */
+            border-color: #22C55E;
+        }
+        .scenario-card.incorrect {
+            background-color: #FEF2F2; /* light red */
+            border-color: #EF4444;
+        }
+        .keypad {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0.5rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+            <header class="text-center mb-6">
+                <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">Mortgage Payment Calculator</h1>
+                <p class="text-gray-600 mt-2">Practice your financial calculation skills!</p>
+            </header>
+
+            <div class="mb-6 flex flex-col sm:flex-row justify-center gap-3">
+                <button id="concept-guide-btn" class="bg-amber-500 text-white font-semibold py-2 px-5 rounded-md hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-400 transition duration-150 ease-in-out">📘 Concept Guide</button>
+                <button id="hint-btn" class="bg-sky-600 text-white font-semibold py-2 px-5 rounded-md hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition duration-150 ease-in-out">💡 Give Me a Hint</button>
+                <button id="walkthrough-btn" class="bg-gray-600 text-white font-semibold py-2 px-5 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition duration-150 ease-in-out">🧭 Show Walkthrough</button>
+            </div>
+
+            <div id="problem-container" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-lg text-gray-700">Property Value:</h3>
+                        <p id="property-value" class="text-2xl font-bold text-indigo-600"></p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-lg text-gray-700">Loan-to-Value (LTV):</h3>
+                        <p id="ltv-ratio" class="text-2xl font-bold text-indigo-600"></p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-lg text-gray-700">Annual Interest Rate:</h3>
+                        <p id="interest-rate" class="text-2xl font-bold text-indigo-600"></p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-lg text-gray-700">Amortization Structure:</h3>
+                        <p id="amortization-structure" class="text-xl font-bold text-indigo-600"></p>
+                    </div>
+                    <div id="balloon-payment-display" class="hidden md:col-span-2 bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+                        <h3 class="font-semibold text-lg text-red-800">Balloon Payment:</h3>
+                        <p id="balloon-payment-amount" class="text-2xl font-bold text-red-600"></p>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <label for="student-answer" class="block text-lg font-medium text-gray-700">Your Calculated Monthly Payment ($):</label>
+                    <div class="mt-2 flex flex-col sm:flex-row items-center gap-4">
+                        <input type="number" id="student-answer" class="flex-grow w-full px-4 py-2 text-lg border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Enter your answer">
+                        <button id="check-answer" class="w-full sm:w-auto bg-indigo-600 text-white font-bold py-2 px-6 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">Check Answer</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="all-scenarios-container" class="hidden mt-8">
+                 <h2 class="text-2xl font-bold text-center mb-4 text-gray-800">Solve All 10 Scenarios</h2>
+                 <div id="scenario-details" class="mb-6 p-4 bg-gray-50 rounded-lg">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                        <div>
+                            <h4 class="font-semibold text-gray-600 text-sm">Property Value</h4>
+                            <p id="scenario-property-value" class="font-bold text-lg text-indigo-600"></p>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-600 text-sm">LTV</h4>
+                            <p id="scenario-ltv" class="font-bold text-lg text-indigo-600"></p>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-600 text-sm">Interest Rate</h4>
+                            <p id="scenario-rate" class="font-bold text-lg text-indigo-600"></p>
+                        </div>
+                    </div>
+                 </div>
+                 <p class="text-center text-gray-600 mb-6">Calculate the payment for each scenario below. The balloon payment is consistent for all Partial loans, and for all Negative loans.</p>
+                 <div id="scenarios-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 </div>
+                 <div class="mt-6">
+                    <canvas id="amortization-chart"></canvas>
+                 </div>
+            </div>
+
+
+            <div id="feedback-container" class="mt-6 p-4 rounded-md text-center hidden">
+                <p id="feedback-text" class="text-xl font-bold"></p>
+                <div id="hint-text" class="text-md mt-2"></div>
+            </div>
+
+            <div class="mt-8 text-center">
+                <button id="new-problem" class="bg-green-600 text-white font-bold py-3 px-8 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out hidden">New Problem</button>
+                <button id="toggle-scenarios" class="bg-blue-600 text-white font-bold py-3 px-8 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">Toggle All Scenarios View</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Walkthrough / Concept Guide -->
+    <div id="walkthrough-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-modal-btn">&times;</span>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Modal for Gifs -->
+    <div id="gif-modal" class="modal">
+        <div class="modal-content bg-transparent border-0 shadow-none text-center">
+            <img id="gif-image" class="gif-frame mx-auto" src="" alt="Result GIF">
+        </div>
+    </div>
+
+    <script>
+        // --- TUTORING MEDIA ---
+        const CORRECT_GIFS = [
+            // Dancing kakapo
+            "https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExOG85bG80ZHFhdzR1djBqcXI0engzZTZxeWl3NTdzMWRpZjAxcGFsaSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/hTh9bSbUPWMWk/giphy.gif",
+            // Celebration (same gif used in the TVOM practice app)
+            "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExZGpzNmUyNjh1ZWN2eDFtY3p1amZ6N2dnMXQxajJrNGh5dzZreTBieiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/6yQq08riFOmeYkW3Xg/giphy.gif"
+        ];
+        const INCORRECT_GIF = "https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExdWdjbDYwdXE5d2lmcHJ3OHo4eDJ5aDJuYWFxNGp0MnJmeWYycTdudSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/hKQeYeYiH6O8Mvygh2/giphy.gif";
+
+        // --- DOM Element References ---
+        const propertyValueEl = document.getElementById('property-value');
+        const ltvRatioEl = document.getElementById('ltv-ratio');
+        const interestRateEl = document.getElementById('interest-rate');
+        const amortizationStructureEl = document.getElementById('amortization-structure');
+        const studentAnswerEl = document.getElementById('student-answer');
+        const checkAnswerBtn = document.getElementById('check-answer');
+        const newProblemBtn = document.getElementById('new-problem');
+        const feedbackContainer = document.getElementById('feedback-container');
+        const feedbackText = document.getElementById('feedback-text');
+        const hintText = document.getElementById('hint-text');
+        const balloonDisplayEl = document.getElementById('balloon-payment-display');
+        const balloonAmountEl = document.getElementById('balloon-payment-amount');
+        const toggleScenariosBtn = document.getElementById('toggle-scenarios');
+        const allScenariosContainer = document.getElementById('all-scenarios-container');
+        const problemContainer = document.getElementById('problem-container');
+        const scenariosGrid = document.getElementById('scenarios-grid');
+        const chartCanvas = document.getElementById('amortization-chart');
+        const conceptGuideBtn = document.getElementById('concept-guide-btn');
+        const hintBtn = document.getElementById('hint-btn');
+        const walkthroughBtn = document.getElementById('walkthrough-btn');
+        const walkthroughModal = document.getElementById('walkthrough-modal');
+        const gifModal = document.getElementById('gif-modal');
+        const gifImage = document.getElementById('gif-image');
+        const modalBody = document.getElementById('modal-body');
+        let amortizationChart = null;
+
+        let state = {
+            propertyValue: 0, ltv: 0, annualRate: 0, loanAmount: 0, isAllScenariosView: false,
+            singleProblem: { amortizationType: '', termYears: 0, correctAnswer: 0, problemFv: 0, fvFactor: 0, attempts: 0 },
+            scenarios: [], partialFvFactor: 0, negativeFvFactor: 0,
+        };
+
+        // --- FORMATTING HELPERS ---
+        function money(num) {
+            return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        /** Renders a signed dollar amount as -$1,234.56 rather than $-1,234.56. */
+        function signedMoney(num) {
+            return `${num < 0 ? '-' : ''}$${money(Math.abs(num))}`;
+        }
+
+        function fetchInterestRate() {
+            const baseRate = 6.5;
+            const randomFluctuation = (Math.random() * 1.5) - 0.75;
+            const rawRate = baseRate + randomFluctuation;
+            return Number((Math.round(rawRate / 0.125) * 0.125).toFixed(3));
+        }
+
+        function generateNewProblem() {
+            state.propertyValue = Math.round((Math.random() * (2000000 - 300000) + 300000) / 1000) * 1000;
+            state.ltv = Math.round(Math.random() * (80 - 65) + 65) / 100;
+            state.annualRate = fetchInterestRate();
+            state.loanAmount = state.propertyValue * state.ltv;
+            state.partialFvFactor = Math.random() * (0.9 - 0.1) + 0.1;
+            state.negativeFvFactor = Math.random() * (1.9 - 1.1) + 1.1;
+
+            const amortizationOptions = [
+                { type: 'Full', term: 15 }, { type: 'Full', term: 20 }, { type: 'Full', term: 30 },
+                { type: 'Partial', term: 15 }, { type: 'Partial', term: 20 }, { type: 'Partial', term: 30 },
+                { type: 'Interest Only', term: 15 },
+                { type: 'Negative', term: 15 }, { type: 'Negative', term: 20 }, { type: 'Negative', term: 30 }
+            ];
+            const selectedOption = amortizationOptions[Math.floor(Math.random() * amortizationOptions.length)];
+
+            Object.assign(state.singleProblem, { amortizationType: selectedOption.type, termYears: selectedOption.term, attempts: 0 });
+
+            let fvFactor = 0;
+            if (selectedOption.type === 'Partial') fvFactor = state.partialFvFactor;
+            if (selectedOption.type === 'Negative') fvFactor = state.negativeFvFactor;
+
+            const calc = calculatePayment(state.loanAmount, state.annualRate, selectedOption.term, selectedOption.type, fvFactor);
+            state.singleProblem.correctAnswer = calc.payment;
+            state.singleProblem.problemFv = calc.fv;
+
+            state.scenarios = amortizationOptions.map(opt => {
+                let factor = 0;
+                if (opt.type === 'Partial') factor = state.partialFvFactor;
+                if (opt.type === 'Negative') factor = state.negativeFvFactor;
+                const scenarioCalc = calculatePayment(state.loanAmount, state.annualRate, opt.term, opt.type, factor);
+                return { ...opt, correctAnswer: scenarioCalc.payment, fv: scenarioCalc.fv, studentAnswer: '', isLocked: false, isCorrect: null, attempts: 0 };
+            });
+
+            resetUIForNewProblem();
+            updateProblemDisplay();
+        }
+
+        function calculatePayment(pv, annualRate, termYears, type, fvFactor) {
+            const i = annualRate / 100 / 12, n = termYears * 12; let fv_signed = 0;
+            switch (type) {
+                case 'Full': fv_signed = 0; break;
+                case 'Partial': fv_signed = -(pv * fvFactor); break;
+                case 'Interest Only': fv_signed = -pv; break;
+                case 'Negative': fv_signed = -(pv * fvFactor); break;
+            }
+            let payment = 0;
+            if (i === 0) payment = n > 0 ? -(pv + fv_signed) / n : 0;
+            else { const num = pv * Math.pow(1 + i, n) + fv_signed, den = Math.pow(1 + i, n) - 1; payment = den !== 0 ? -(num / den) * i : 0; }
+            return { payment: payment, fv: Math.abs(fv_signed) };
+        }
+
+        function checkAnswer() {
+            const studentAnswer = parseFloat(studentAnswerEl.value);
+            if (isNaN(studentAnswer)) { showFeedback("Please enter a valid number.", "error"); return; }
+
+            state.singleProblem.attempts++;
+
+            const difference = Math.abs(Math.abs(studentAnswer) - Math.abs(state.singleProblem.correctAnswer));
+            const isCorrect = difference <= 2.00;
+
+            if (isCorrect) {
+                showFeedback("Correct!", "success");
+                hintText.innerHTML = '';
+                lockProblem();
+                showGif(CORRECT_GIFS[Math.floor(Math.random() * CORRECT_GIFS.length)]);
+            } else {
+                if (state.singleProblem.attempts === 1) {
+                    showFeedback("Incorrect. Try again!", "error");
+                    provideHint();
+                    diagnoseAnswer(studentAnswer);
+                } else {
+                    showFeedback(`Incorrect. The correct payment is $${money(Math.abs(state.singleProblem.correctAnswer))}.`, "error");
+                    showGif(INCORRECT_GIF);
+                    discloseInputsOnFailure();
+                    diagnoseAnswer(studentAnswer);
+                    lockProblem();
+                }
+            }
+        }
+
+        /**
+         * Pre-coded diagnostic tutoring: compares the student's answer against the
+         * payments that the most common setup mistakes would produce, and names the
+         * mistake when one of them matches.
+         */
+        function diagnoseAnswer(studentAnswer) {
+            const given = Math.abs(studentAnswer);
+            const { loanAmount, annualRate, propertyValue } = state;
+            const { termYears, amortizationType, problemFv, correctAnswer } = state.singleProblem;
+
+            const i = annualRate / 100 / 12;
+            const n = termYears * 12;
+            // FV as it should be entered: negative, because it is still owed at maturity.
+            const fvSigned = amortizationType === 'Interest Only' ? -loanAmount : -problemFv;
+
+            /** Solves for PMT the same way the calculator does, for an arbitrary set of inputs. */
+            const pmtFrom = (pv, fv, rate, periods) => {
+                if (rate === 0) return periods > 0 ? -(pv + fv) / periods : 0;
+                const den = Math.pow(1 + rate, periods) - 1;
+                return den !== 0 ? -((pv * Math.pow(1 + rate, periods) + fv) / den) * rate : 0;
+            };
+
+            const close = (a, b) => Math.abs(a - Math.abs(b)) <= Math.max(2.00, Math.abs(b) * 0.005);
+            const misses = [];
+            const add = (wrongPmt, message) => {
+                if (close(given, wrongPmt) && !close(given, correctAnswer)) misses.push(message);
+            };
+
+            // Property value used as PV instead of the loan amount. For interest-only the
+            // balloon tracks PV; otherwise the student keeps the balloon shown on screen.
+            add(pmtFrom(propertyValue, amortizationType === 'Interest Only' ? -propertyValue : fvSigned, i, n),
+                `It looks like you used the <strong>property value</strong> as PV. The loan is only ${(state.ltv * 100).toFixed(0)}% of value, so PV = $${money(loanAmount)}.`);
+
+            // Annual periods used where monthly were required (P/YR left at 1).
+            add(pmtFrom(loanAmount, fvSigned, annualRate / 100, termYears),
+                "It looks like you used <strong>annual</strong> periods. Set P/YR = 12, use N = years &times; 12 months, and enter the annual rate as I/YR.");
+
+            // Balloon ignored (FV left at 0) on a loan that does not fully amortize.
+            if (amortizationType !== 'Full') {
+                add(pmtFrom(loanAmount, 0, i, n),
+                    "It looks like you left <strong>FV = 0</strong>. This loan does not fully amortize &mdash; enter the balloon as a negative FV.");
+                // Balloon entered with the wrong sign.
+                add(pmtFrom(loanAmount, -fvSigned, i, n),
+                    "Check the <strong>sign</strong> on FV. PV (cash you receive) and FV (cash you still owe) move in opposite directions: PV positive, FV negative.");
+            }
+
+            if (misses.length > 0) {
+                hintText.innerHTML += `<div class="mt-3 text-left max-w-xl mx-auto p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900">${misses.map(m => `<p class="mb-1">&#9888;&#65039; ${m}</p>`).join('')}</div>`;
+            }
+        }
+
+        function discloseInputsOnFailure() {
+            const { loanAmount, annualRate } = state; const { termYears, problemFv, amortizationType } = state.singleProblem;
+            const n_val = termYears * 12, iy_val = (annualRate / 12).toFixed(4), pv_val = money(loanAmount);
+            let fv_for_input = amortizationType === 'Interest Only' ? -loanAmount : -problemFv;
+            const fv_val_display = signedMoney(fv_for_input);
+            hintText.innerHTML = `<div class="text-left w-full max-w-sm mx-auto mt-4 p-4 bg-gray-50 rounded-lg grid grid-cols-2 gap-x-4 gap-y-2"><div class="font-semibold text-gray-700">PV:</div><div class="font-mono text-gray-900">$${pv_val}</div><div class="font-semibold text-gray-700">I/Y:</div><div class="font-mono text-gray-900">${iy_val}%</div><div class="font-semibold text-gray-700">N:</div><div class="font-mono text-gray-900">${n_val}</div><div class="font-semibold text-gray-700">FV:</div><div class="font-mono text-gray-900">${fv_val_display}</div></div>`;
+        }
+
+        function provideHint() {
+            const { loanAmount, annualRate } = state; const { termYears, problemFv, amortizationType } = state.singleProblem;
+            const n = termYears * 12, iy = (annualRate / 12).toFixed(4), pv = loanAmount;
+            let fvForHint = amortizationType === 'Interest Only' ? loanAmount : problemFv;
+            const hints = [{ name: 'N', value: n }, { name: 'I/Y', value: `${iy}%` }, { name: 'PV', value: `$${money(pv)}` }];
+            if (fvForHint > 0) hints.push({ name: 'FV', value: `-$${money(fvForHint)}` });
+            const randomHint = hints[Math.floor(Math.random() * hints.length)];
+            hintText.innerHTML = `<span>Hint: Check your value for ${randomHint.name}. The correct value is ${randomHint.value}.</span>`;
+        }
+
+        // --- ON-DEMAND TUTORING ---------------------------------------------------
+
+        /** A nudge the student can request at any time, without revealing the answer. */
+        function showOnDemandHint() {
+            if (state.isAllScenariosView) {
+                openWalkthroughModal(buildConceptGuideHTML());
+                return;
+            }
+            const { amortizationType, termYears } = state.singleProblem;
+            const nudges = {
+                'Full': [
+                    `Full amortization means the balance reaches exactly zero at the end of the term, so <strong>FV = 0</strong>.`,
+                    `N is in <em>months</em>: ${termYears} &times; 12 = ${termYears * 12}.`,
+                    `PV is the <em>loan</em>, not the property: ${(state.ltv * 100).toFixed(0)}% of the property value.`
+                ],
+                'Partial': [
+                    `Partial amortization pays the balance <em>down</em> but not to zero &mdash; the leftover is the balloon shown on screen. Enter it as a <strong>negative FV</strong>.`,
+                    `The balloon is smaller than the loan, so your payment will be lower than the fully amortizing payment for the same term.`,
+                    `N = ${termYears} &times; 12 = ${termYears * 12} months, and PV is the loan amount.`
+                ],
+                'Interest Only': [
+                    `Interest only means the balance never changes: <strong>FV = &minus;PV</strong>.`,
+                    `Shortcut: payment = loan &times; (annual rate / 12). The term does not affect the payment at all.`,
+                    `If your payment changes when you change N, you have not set FV = &minus;PV.`
+                ],
+                'Negative': [
+                    `Negative amortization means the balance <em>grows</em>: the balloon is larger than the original loan. Enter that larger number as a <strong>negative FV</strong>.`,
+                    `Because the balance grows, the payment is smaller than the interest-only payment.`,
+                    `N = ${termYears} &times; 12 = ${termYears * 12} months, and PV is the loan amount, not the property value.`
+                ]
+            };
+            const pool = nudges[amortizationType] || nudges['Full'];
+            const nudge = pool[Math.floor(Math.random() * pool.length)];
+            feedbackContainer.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700');
+            feedbackContainer.classList.add('bg-sky-100', 'text-sky-800');
+            feedbackText.textContent = '💡 Hint';
+            hintText.innerHTML = `<span>${nudge}</span>`;
+        }
+
+        function conceptSummary(type) {
+            switch (type) {
+                case 'Full':
+                    return `<p>A <strong>fully amortizing</strong> loan is repaid entirely by its scheduled payments. The outstanding balance declines every month and hits exactly <strong>zero</strong> on the final payment, so the future value of the loan at the end of the term is <strong>FV = 0</strong>. Each payment covers that month's interest first; whatever is left over reduces principal.</p>`;
+                case 'Partial':
+                    return `<p>A <strong>partially amortizing</strong> loan uses a payment large enough to reduce the balance, but not large enough to retire it over the term. Whatever is left when the term ends is the <strong>balloon payment</strong>, which you enter as the future value. Because 0 &lt; balloon &lt; loan, the payment sits between the interest-only payment and the fully amortizing payment.</p>`;
+                case 'Interest Only':
+                    return `<p>An <strong>interest-only</strong> loan's payment covers exactly the interest accrued each month and nothing more, so the balance never moves. The balloon at maturity equals the original loan, i.e. <strong>FV = &minus;PV</strong>. Note the payment does not depend on the term at all &mdash; a 15-year and a 30-year interest-only loan at the same rate have the same payment.</p>`;
+                case 'Negative':
+                    return `<p>A <strong>negatively amortizing</strong> loan's payment is smaller than the monthly interest charge. The shortfall is added to principal, so the balance <em>grows</em> over time and the balloon owed at maturity is <strong>larger</strong> than the amount originally borrowed. This is the riskiest structure for the lender because the loan-to-value ratio rises unless the property appreciates faster than the balance.</p>`;
+                default:
+                    return '';
+            }
+        }
+
+        function commonMistakes(type) {
+            const shared = [
+                `Using the <strong>property value</strong> instead of the loan amount as PV. Loan = Property Value &times; LTV.`,
+                `Leaving <strong>P/YR = 1</strong> on the HP 10bii+ while entering monthly periods. For monthly payments set P/YR = 12 and enter the <em>annual</em> rate as I/YR.`,
+                `Entering N in <strong>years</strong> instead of months.`
+            ];
+            const specific = {
+                'Full': [`Entering a balloon when there isn't one &mdash; a fully amortizing loan has <strong>FV = 0</strong>.`],
+                'Partial': [`Leaving <strong>FV = 0</strong> and solving for the fully amortizing payment, which overstates the answer.`, `Entering the balloon as a <em>positive</em> FV. PV and FV must have opposite signs.`],
+                'Interest Only': [`Solving with FV = 0, which gives a fully amortizing payment.`, `Forgetting that payment = loan &times; monthly rate &mdash; no time value needed.`],
+                'Negative': [`Entering the <em>original loan</em> as FV instead of the larger balloon.`, `Assuming the payment must exceed the interest-only payment &mdash; here it is <em>lower</em>, which is exactly why the balance grows.`]
+            };
+            return [...(specific[type] || []), ...shared];
+        }
+
+        function buildWalkthroughHTML(ctx) {
+            const { type, termYears, fv, correctAnswer, title } = ctx;
+            const annualRate = Number(state.annualRate);
+            const n = termYears * 12;
+            const pv = state.loanAmount;
+            const monthlyRate = annualRate / 12;
+            const fvSigned = (type === 'Interest Only') ? -pv : -fv;
+            const payment = Math.abs(correctAnswer);
+
+            let html = `<h3 class="text-2xl font-bold mb-1">Walkthrough</h3>
+                <p class="text-gray-600 mb-4">${title}</p>`;
+
+            // 1. Conceptual summary
+            html += `<div class="mb-5">
+                <h4 class="text-xl font-semibold mb-2">1. Conceptual Summary</h4>
+                <div class="text-gray-700 space-y-2">${conceptSummary(type)}</div>
+            </div>`;
+
+            // 2. Building the inputs
+            html += `<div class="mb-5">
+                <h4 class="text-xl font-semibold mb-2">2. Build Your Five Inputs</h4>
+                <div class="bg-gray-100 p-3 rounded-lg space-y-2 text-sm text-gray-800">
+                    <p><strong>PV (loan amount)</strong> = Property Value &times; LTV = $${money(state.propertyValue)} &times; ${(state.ltv * 100).toFixed(0)}% = <span class="font-mono">$${money(pv)}</span></p>
+                    <p><strong>N (months)</strong> = ${termYears} years &times; 12 = <span class="font-mono">${n}</span></p>
+                    <p><strong>I/YR (annual)</strong> = <span class="font-mono">${annualRate}%</span> &nbsp;&rarr;&nbsp; monthly rate = ${annualRate}% / 12 = <span class="font-mono">${monthlyRate.toFixed(4)}%</span></p>
+                    <p><strong>FV (balloon owed at maturity)</strong> = <span class="font-mono">${signedMoney(fvSigned)}</span> ${fvSigned === 0 ? '(the loan fully amortizes)' : '(negative &mdash; it is still owed)'}</p>
+                    <p><strong>PMT</strong> = the unknown we solve for.</p>
+                </div>
+            </div>`;
+
+            // 3. HP 10bii+ keystrokes
+            html += `<div class="mb-5">
+                <h4 class="text-xl font-semibold mb-2">3. HP 10bii+ Calculator Inputs</h4>
+                <div class="keypad bg-gray-200 p-3 rounded-lg text-sm">
+                    <p class="font-mono col-span-2 font-bold">12 [SHIFT] [P/YR] &nbsp;&nbsp;(set 12 payments per year)</p>
+                    <p class="font-mono col-span-2">[SHIFT] [C ALL] &nbsp;&nbsp;(clear old values first)</p>
+                    <p class="font-mono">${n}</p><p>[N]</p>
+                    <p class="font-mono">${annualRate}</p><p>[I/YR]</p>
+                    <p class="font-mono">${pv.toFixed(2)}</p><p>[PV]</p>
+                    <p class="font-mono">${fvSigned === 0 ? '0' : Math.abs(fvSigned).toFixed(2) + ' [+/-]'}</p><p>[FV]</p>
+                    <p class="font-mono font-bold">Solve for:</p><p class="font-bold">[PMT]</p>
+                </div>
+                <p class="mt-2 text-sm text-gray-600">Result: <span class="font-mono font-bold">&minus;$${money(payment)}</span> per month. The minus sign just means the payment is cash flowing <em>out</em> of your pocket.</p>
+            </div>`;
+
+            // 4. Excel formula
+            const excelFv = fvSigned === 0 ? '0' : `-${Math.abs(fvSigned).toFixed(2)}`;
+            html += `<div class="mb-5">
+                <h4 class="text-xl font-semibold mb-2">4. MS Excel / Google Sheets Formula</h4>
+                <p class="bg-gray-800 text-white font-mono p-3 rounded-lg break-all text-sm">=PMT(${annualRate}%/12, ${n}, ${pv.toFixed(2)}, ${excelFv})</p>
+                <p class="mt-2 text-sm text-gray-600">Excel returns <span class="font-mono">-${payment.toFixed(2)}</span>. Wrap it in <span class="font-mono">ABS()</span> if you want a positive number.</p>
+            </div>`;
+
+            // 5. Algebra
+            html += `<div class="mb-5">
+                <h4 class="text-xl font-semibold mb-2">5. The Formula Behind It</h4>
+                <p class="bg-gray-100 p-3 rounded-lg font-mono text-sm break-all">PMT = &minus;i &times; [ PV &times; (1+i)<sup>n</sup> + FV ] / [ (1+i)<sup>n</sup> &minus; 1 ]</p>
+                <p class="mt-2 text-sm text-gray-600">where i = ${annualRate}% / 12 / 100 = ${(annualRate / 1200).toFixed(6)} and n = ${n}.</p>`;
+            if (type === 'Interest Only') {
+                html += `<p class="mt-2 text-sm text-gray-600">Shortcut for interest only: PMT = PV &times; i = $${money(pv)} &times; ${(annualRate / 1200).toFixed(6)} = <span class="font-mono">$${money(payment)}</span>.</p>`;
+            }
+            html += `</div>`;
+
+            // 6. Common mistakes
+            html += `<div>
+                <h4 class="text-xl font-semibold mb-2">6. Common Mistakes on This Type</h4>
+                <ul class="list-disc list-inside text-sm text-gray-700 space-y-1">
+                    ${commonMistakes(type).map(m => `<li>${m}</li>`).join('')}
+                </ul>
+            </div>`;
+
+            return html;
+        }
+
+        function buildConceptGuideHTML() {
+            return `<h3 class="text-2xl font-bold mb-4">Concept Guide: Mortgage Payments</h3>
+
+            <div class="mb-5">
+                <h4 class="text-xl font-semibold mb-2">Step 1 &mdash; Find the loan amount</h4>
+                <p class="text-gray-700 text-sm">The lender does not lend the full property value. The <strong>loan-to-value (LTV)</strong> ratio tells you how much: <span class="font-mono">Loan = Property Value &times; LTV</span>. This loan amount is your <strong>PV</strong>. Using the property value by mistake is the single most common error in this exercise.</p>
+            </div>
+
+            <div class="mb-5">
+                <h4 class="text-xl font-semibold mb-2">Step 2 &mdash; Put time and rate on the same clock</h4>
+                <p class="text-gray-700 text-sm">Mortgage payments are monthly, so every input must be monthly. <span class="font-mono">N = years &times; 12</span>. On the HP 10bii+ set <span class="font-mono">P/YR = 12</span> and enter the <em>annual</em> rate as I/YR &mdash; the calculator divides for you. In Excel there is no P/YR, so you divide yourself: <span class="font-mono">rate/12</span>.</p>
+            </div>
+
+            <div class="mb-5">
+                <h4 class="text-xl font-semibold mb-2">Step 3 &mdash; Decide what FV is</h4>
+                <p class="text-gray-700 text-sm mb-2">FV is the balance still owed the day the term ends. This is what separates the four structures:</p>
+                <table class="w-full text-sm border-collapse mb-2">
+                    <thead><tr class="bg-gray-200 text-left"><th class="p-2 border">Structure</th><th class="p-2 border">FV</th><th class="p-2 border">Balance over time</th></tr></thead>
+                    <tbody>
+                        <tr><td class="p-2 border font-semibold">Full</td><td class="p-2 border font-mono">0</td><td class="p-2 border">Falls to zero</td></tr>
+                        <tr class="bg-gray-50"><td class="p-2 border font-semibold">Partial</td><td class="p-2 border font-mono">&minus;balloon (&lt; loan)</td><td class="p-2 border">Falls, but not to zero</td></tr>
+                        <tr><td class="p-2 border font-semibold">Interest Only</td><td class="p-2 border font-mono">&minus;loan</td><td class="p-2 border">Flat</td></tr>
+                        <tr class="bg-gray-50"><td class="p-2 border font-semibold">Negative</td><td class="p-2 border font-mono">&minus;balloon (&gt; loan)</td><td class="p-2 border">Rises</td></tr>
+                    </tbody>
+                </table>
+                <p class="text-gray-700 text-sm">Ranking the payments for a given loan, rate and term: <strong>Full &gt; Partial &gt; Interest Only &gt; Negative</strong>. Use this as a sanity check on any answer you compute.</p>
+            </div>
+
+            <div class="mb-5">
+                <h4 class="text-xl font-semibold mb-2">Step 4 &mdash; Mind the signs</h4>
+                <p class="text-gray-700 text-sm">Cash you <em>receive</em> is positive; cash you <em>pay</em> is negative. You receive the loan (PV positive), so the payment and the balloon come back negative (PMT and FV negative). If PV and FV carry the same sign, your calculator will hand you nonsense.</p>
+            </div>
+
+            <div>
+                <h4 class="text-xl font-semibold mb-2">Quick reference &mdash; HP 10bii+</h4>
+                <div class="keypad bg-gray-200 p-3 rounded-lg text-sm">
+                    <p class="font-mono col-span-2">12 [SHIFT] [P/YR]</p>
+                    <p class="font-mono col-span-2">[SHIFT] [C ALL]</p>
+                    <p class="font-mono">years &times; 12</p><p>[N]</p>
+                    <p class="font-mono">annual rate</p><p>[I/YR]</p>
+                    <p class="font-mono">loan amount</p><p>[PV]</p>
+                    <p class="font-mono">balloon [+/-]</p><p>[FV]</p>
+                    <p class="font-mono font-bold">Solve:</p><p class="font-bold">[PMT]</p>
+                </div>
+                <h4 class="text-xl font-semibold mt-4 mb-2">Quick reference &mdash; Excel</h4>
+                <p class="bg-gray-800 text-white font-mono p-3 rounded-lg break-all text-sm">=PMT(annual_rate/12, years*12, loan_amount, -balloon)</p>
+            </div>`;
+        }
+
+        function showSingleProblemWalkthrough() {
+            if (state.isAllScenariosView) {
+                openWalkthroughModal(buildConceptGuideHTML());
+                return;
+            }
+            const { amortizationType, termYears, problemFv, correctAnswer } = state.singleProblem;
+            openWalkthroughModal(buildWalkthroughHTML({
+                type: amortizationType,
+                termYears: termYears,
+                fv: problemFv,
+                correctAnswer: correctAnswer,
+                title: `${termYears}-Year, ${amortizationType} Amortization`
+            }));
+        }
+
+        function showScenarioWalkthrough(index) {
+            const s = state.scenarios[index];
+            openWalkthroughModal(buildWalkthroughHTML({
+                type: s.type,
+                termYears: s.term,
+                fv: s.fv,
+                correctAnswer: s.correctAnswer,
+                title: `${s.term}-Year, ${s.type} Amortization`
+            }));
+        }
+
+        function openWalkthroughModal(html) {
+            modalBody.innerHTML = html;
+            modalBody.parentElement.scrollTop = 0;
+            walkthroughModal.style.display = 'flex';
+        }
+
+        function showGif(url) {
+            gifImage.src = url;
+            gifModal.style.display = 'flex';
+            setTimeout(() => { gifModal.style.display = 'none'; }, 2500);
+        }
+
+        // --- DISPLAY / STATE ------------------------------------------------------
+
+        function updateProblemDisplay() {
+            propertyValueEl.textContent = `$${state.propertyValue.toLocaleString()}`; ltvRatioEl.textContent = `${(state.ltv * 100).toFixed(0)}%`; interestRateEl.textContent = `${state.annualRate}%`;
+            const { termYears, amortizationType, problemFv } = state.singleProblem;
+            amortizationStructureEl.textContent = `${termYears}-Year, ${amortizationType} Amortization`;
+            if (amortizationType === 'Partial' || amortizationType === 'Negative') { balloonAmountEl.textContent = `$${money(problemFv)}`; balloonDisplayEl.classList.remove('hidden'); }
+            else { balloonDisplayEl.classList.add('hidden'); }
+        }
+
+        function resetUIForNewProblem() {
+            state.singleProblem.attempts = 0; studentAnswerEl.value = ''; studentAnswerEl.disabled = false;
+            checkAnswerBtn.disabled = false; checkAnswerBtn.classList.remove('bg-gray-400', 'cursor-not-allowed'); checkAnswerBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            newProblemBtn.classList.add('hidden'); feedbackContainer.classList.add('hidden'); hintText.innerHTML = '';
+            if (amortizationChart) { amortizationChart.destroy(); amortizationChart = null; }
+        }
+
+        function lockProblem() {
+            studentAnswerEl.disabled = true; checkAnswerBtn.disabled = true;
+            checkAnswerBtn.classList.add('bg-gray-400', 'cursor-not-allowed'); checkAnswerBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+            newProblemBtn.classList.remove('hidden');
+        }
+
+        function showFeedback(message, type) {
+            feedbackText.textContent = message; feedbackContainer.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700', 'bg-sky-100', 'text-sky-800');
+            if (type === 'success') feedbackContainer.classList.add('bg-green-100', 'text-green-700');
+            else feedbackContainer.classList.add('bg-red-100', 'text-red-700');
+        }
+
+        function toggleAllScenariosView() {
+            state.isAllScenariosView = !state.isAllScenariosView;
+            if (state.isAllScenariosView) {
+                problemContainer.classList.add('hidden'); allScenariosContainer.classList.remove('hidden');
+                toggleScenariosBtn.textContent = 'Back to Single Problem'; newProblemBtn.classList.add('hidden'); feedbackContainer.classList.add('hidden');
+                hintBtn.textContent = '💡 Concept Refresher';
+                walkthroughBtn.textContent = '🧭 How To Solve These';
+                setupAllScenariosView();
+            } else {
+                problemContainer.classList.remove('hidden'); allScenariosContainer.classList.add('hidden');
+                toggleScenariosBtn.textContent = 'Toggle All Scenarios View';
+                hintBtn.textContent = '💡 Give Me a Hint';
+                walkthroughBtn.textContent = '🧭 Show Walkthrough';
+                if (studentAnswerEl.disabled) newProblemBtn.classList.remove('hidden');
+            }
+        }
+
+        function setupAllScenariosView() {
+            scenariosGrid.innerHTML = ''; if (amortizationChart) { amortizationChart.destroy(); amortizationChart = null; }
+            document.getElementById('scenario-property-value').textContent = `$${state.propertyValue.toLocaleString()}`;
+            document.getElementById('scenario-ltv').textContent = `${(state.ltv * 100).toFixed(0)}%`;
+            document.getElementById('scenario-rate').textContent = `${state.annualRate}%`;
+
+            state.scenarios.forEach((scenario, index) => {
+                const card = document.createElement('div'); card.id = `scenario-card-${index}`; card.className = 'scenario-card p-4 rounded-lg border border-gray-200 shadow-sm space-y-2';
+                let balloonInfo = '';
+                if (scenario.type === 'Partial' || scenario.type === 'Negative') balloonInfo = `<p class="text-xs text-gray-600">Balloon: $${scenario.fv.toLocaleString('en-US', { maximumFractionDigits: 2 })}</p>`;
+                card.innerHTML = `<h4 class="font-bold text-md text-gray-800">${scenario.term}-Year ${scenario.type}</h4>${balloonInfo}<div class="flex items-center gap-2"><input type="number" id="scenario-input-${index}" class="flex-grow w-full px-2 py-1 text-sm border-gray-300 rounded-md shadow-sm" placeholder="Payment"><button id="scenario-btn-${index}" class="text-sm bg-indigo-500 text-white font-bold py-1 px-3 rounded-md hover:bg-indigo-600">Check</button></div><div id="scenario-feedback-${index}" class="text-xs font-semibold text-center min-h-4"></div><div id="scenario-help-${index}" class="text-center"></div>`;
+                scenariosGrid.appendChild(card);
+                document.getElementById(`scenario-btn-${index}`).addEventListener('click', () => checkScenarioAnswer(index));
+            });
+        }
+
+        function checkScenarioAnswer(index) {
+            const scenario = state.scenarios[index]; if (scenario.isLocked) return;
+            const inputEl = document.getElementById(`scenario-input-${index}`);
+            const studentAnswer = parseFloat(inputEl.value);
+            if (isNaN(studentAnswer)) return;
+
+            scenario.attempts++;
+
+            const difference = Math.abs(Math.abs(studentAnswer) - Math.abs(scenario.correctAnswer));
+            const isCorrect = difference <= 2.00;
+            const feedbackEl = document.getElementById(`scenario-feedback-${index}`);
+            const cardEl = document.getElementById(`scenario-card-${index}`);
+
+            if (isCorrect) {
+                scenario.isCorrect = true; feedbackEl.textContent = 'Correct!'; feedbackEl.className = 'text-xs font-semibold text-center min-h-4 text-green-600'; cardEl.classList.add('correct');
+                // Keep the tutoring path alive even if the Chart.js CDN is unavailable.
+                try { updateGraphOnCorrectAnswer(index); } catch (err) { console.error('Chart unavailable:', err); }
+            } else {
+                scenario.isCorrect = false; feedbackEl.textContent = scenario.attempts === 1 ? 'Incorrect, try again.' : `Incorrect. Answer: $${money(Math.abs(scenario.correctAnswer))}`;
+                feedbackEl.className = 'text-xs font-semibold text-center min-h-4 text-red-600'; cardEl.classList.add('incorrect');
+            }
+
+            if (isCorrect || scenario.attempts >= 2) {
+                scenario.isLocked = true;
+                inputEl.disabled = true;
+                const btn = document.getElementById(`scenario-btn-${index}`);
+                btn.disabled = true; btn.classList.add('bg-gray-400', 'cursor-not-allowed');
+                addScenarioWalkthroughButton(index);
+            }
+        }
+
+        function addScenarioWalkthroughButton(index) {
+            const helpEl = document.getElementById(`scenario-help-${index}`);
+            if (!helpEl || helpEl.dataset.ready === 'true') return;
+            const btn = document.createElement('button');
+            btn.textContent = 'Show Walkthrough';
+            btn.className = 'text-xs bg-gray-500 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded-md mt-1';
+            btn.addEventListener('click', () => showScenarioWalkthrough(index));
+            helpEl.appendChild(btn);
+            helpEl.dataset.ready = 'true';
+        }
+
+        function calculateMonthlyBalance(pv, pmt, i, k) {
+            if (i === 0) return pv + (pmt * k);
+            return pv * Math.pow(1 + i, k) + pmt * ((Math.pow(1 + i, k) - 1) / i);
+        }
+
+        function getDatasetForScenario(scenarioIndex) {
+            const colors = ['#4F46E5', '#16A34A', '#DB2777', '#D97706', '#0891B2', '#6D28D9', '#BE185D', '#047857', '#9333EA', '#CA8A04'];
+            const scenario = state.scenarios[scenarioIndex]; const balanceData = []; const monthlyRate = state.annualRate / 100 / 12; const termInMonths = scenario.term * 12;
+            for (let k = 0; k <= 400; k++) { if (k > termInMonths) balanceData.push(NaN); else balanceData.push(calculateMonthlyBalance(state.loanAmount, scenario.correctAnswer, monthlyRate, k)); }
+            return { label: `${scenario.term}-Yr ${scenario.type}`, data: balanceData, borderColor: colors[scenarioIndex % colors.length], borderWidth: 2, pointRadius: 0, fill: false, tension: 0.1, payment: scenario.correctAnswer };
+        }
+
+        function updateGraphOnCorrectAnswer(scenarioIndex) {
+            if (!amortizationChart) {
+                const datasets = [ { label: 'Property Value', data: Array(401).fill(state.propertyValue), borderColor: '#4B5563', borderWidth: 2, borderDash: [5, 5], pointRadius: 0, fill: false }, getDatasetForScenario(scenarioIndex) ];
+                let maxBalloon = 0; state.scenarios.forEach(s => { if(s.fv > maxBalloon) maxBalloon = s.fv; });
+                const maxY = Math.max(state.propertyValue, maxBalloon) * 1.1; const labels = Array.from({length: 401}, (_, i) => i);
+                amortizationChart = new Chart(chartCanvas, {
+                    type: 'line', data: { labels, datasets },
+                    options: { responsive: true, plugins: { legend: { position: 'top' }, title: { display: true, text: 'Loan Balance Over Time' } }, scales: { x: { title: { display: true, text: 'Months' }, max: 400 }, y: { title: { display: true, text: 'Outstanding Balance ($)' }, min: 0, max: maxY, ticks: { callback: value => '$' + value.toLocaleString() } } } },
+                    plugins: [{ id: 'line-end-labels', afterDraw: chart => { const ctx = chart.ctx; chart.data.datasets.forEach((dataset, i) => { const meta = chart.getDatasetMeta(i); if (meta.hidden || !dataset.payment) return; let lastIndex = dataset.data.length - 1; while(isNaN(dataset.data[lastIndex]) && lastIndex > 0) lastIndex--; if (lastIndex <= 0) return; const lastPoint = meta.data[lastIndex]; ctx.font = '11px Inter'; ctx.fillStyle = dataset.borderColor; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; const pmtText = `$${Math.abs(dataset.payment).toFixed(2)}`; ctx.fillText(pmtText, lastPoint.x + 5, lastPoint.y); }); } }]
+                });
+            } else { amortizationChart.data.datasets.push(getDatasetForScenario(scenarioIndex)); amortizationChart.update(); }
+        }
+
+        // --- EVENT WIRING ---
+        checkAnswerBtn.addEventListener('click', checkAnswer);
+        newProblemBtn.addEventListener('click', generateNewProblem);
+        toggleScenariosBtn.addEventListener('click', toggleAllScenariosView);
+        studentAnswerEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkAnswer(); });
+        conceptGuideBtn.addEventListener('click', () => openWalkthroughModal(buildConceptGuideHTML()));
+        hintBtn.addEventListener('click', showOnDemandHint);
+        walkthroughBtn.addEventListener('click', showSingleProblemWalkthrough);
+        document.getElementById('close-modal-btn').addEventListener('click', () => { walkthroughModal.style.display = 'none'; });
+        window.addEventListener('click', (event) => {
+            if (event.target === walkthroughModal) walkthroughModal.style.display = 'none';
+            if (event.target === gifModal) gifModal.style.display = 'none';
+        });
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { walkthroughModal.style.display = 'none'; gifModal.style.display = 'none'; }
+        });
+
+        window.onload = () => { generateNewProblem(); };
+    </script>
+</body>
+</html>
