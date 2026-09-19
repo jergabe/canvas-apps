@@ -357,7 +357,7 @@
 
             // Annual periods used where monthly were required (P/YR left at 1).
             add(pmtFrom(loanAmount, fvSigned, annualRate / 100, termYears),
-                "It looks like you used <strong>annual</strong> periods. Set P/YR = 12, use N = years &times; 12 months, and enter the annual rate as I/YR.");
+                `It looks like you worked in <strong>annual</strong> periods. Everything must be monthly: N = ${termYears} &times; 12 = ${n}, and I/YR = ${annualRate}% &divide; 12 = ${(annualRate / 12).toFixed(4)}%.`);
 
             // Balloon ignored (FV left at 0) on a loan that does not fully amortize.
             if (amortizationType !== 'Full') {
@@ -448,7 +448,8 @@
         function commonMistakes(type) {
             const shared = [
                 `Using the <strong>property value</strong> instead of the loan amount as PV. Loan = Property Value &times; LTV.`,
-                `Leaving <strong>P/YR = 1</strong> on the HP 10bii+ while entering monthly periods. For monthly payments set P/YR = 12 and enter the <em>annual</em> rate as I/YR.`,
+                `Entering the <strong>annual</strong> rate as I/YR. With P/YR = 1 the rate must be per <em>period</em>, so key in annual &divide; 12.`,
+                `Changing <strong>P/YR</strong> away from 1. Leave it at 1 &mdash; then the calculator takes exactly the same inputs as Excel, and there is nothing to reset for your next class.`,
                 `Entering N in <strong>years</strong> instead of months.`
             ];
             const specific = {
@@ -484,7 +485,7 @@
                 <div class="bg-gray-100 p-3 rounded-lg space-y-2 text-sm text-gray-800">
                     <p><strong>PV (loan amount)</strong> = Property Value &times; LTV = $${money(state.propertyValue)} &times; ${(state.ltv * 100).toFixed(0)}% = <span class="font-mono">$${money(pv)}</span></p>
                     <p><strong>N (months)</strong> = ${termYears} years &times; 12 = <span class="font-mono">${n}</span></p>
-                    <p><strong>I/YR (annual)</strong> = <span class="font-mono">${annualRate}%</span> &nbsp;&rarr;&nbsp; monthly rate = ${annualRate}% / 12 = <span class="font-mono">${monthlyRate.toFixed(4)}%</span></p>
+                    <p><strong>I/YR (rate per month)</strong> = annual &divide; 12 = ${annualRate}% &divide; 12 = <span class="font-mono">${monthlyRate.toFixed(4)}%</span> &mdash; key in <span class="font-mono">${annualRate} &divide; 12 =</span> rather than the rounded decimal, so you keep the full precision.</p>
                     <p><strong>FV (balloon owed at maturity)</strong> = <span class="font-mono">${signedMoney(fvSigned)}</span> ${fvSigned === 0 ? '(the loan fully amortizes)' : '(negative &mdash; it is still owed)'}</p>
                     <p><strong>PMT</strong> = the unknown we solve for.</p>
                 </div>
@@ -494,15 +495,16 @@
             html += `<div class="mb-5">
                 <h4 class="text-xl font-semibold mb-2">3. HP 10bii+ Calculator Inputs</h4>
                 <div class="keypad bg-gray-200 p-3 rounded-lg text-sm">
-                    <p class="font-mono col-span-2 font-bold">12 [SHIFT] [P/YR] &nbsp;&nbsp;(set 12 payments per year)</p>
+                    <p class="font-mono col-span-2 font-bold">1 [SHIFT] [P/YR] &nbsp;&nbsp;(always 1 &mdash; one payment per period)</p>
                     <p class="font-mono col-span-2">[SHIFT] [C ALL] &nbsp;&nbsp;(clear old values first)</p>
-                    <p class="font-mono">${n}</p><p>[N]</p>
-                    <p class="font-mono">${annualRate}</p><p>[I/YR]</p>
+                    <p class="font-mono">${n}</p><p>[N] &nbsp;&nbsp;(months, not years)</p>
+                    <p class="font-mono">${annualRate} &divide; 12 =</p><p>[I/YR] &nbsp;&nbsp;(= ${monthlyRate.toFixed(4)}% per month)</p>
                     <p class="font-mono">${pv.toFixed(2)}</p><p>[PV]</p>
                     <p class="font-mono">${fvSigned === 0 ? '0' : Math.abs(fvSigned).toFixed(2) + ' [+/-]'}</p><p>[FV]</p>
                     <p class="font-mono font-bold">Solve for:</p><p class="font-bold">[PMT]</p>
                 </div>
                 <p class="mt-2 text-sm text-gray-600">Result: <span class="font-mono font-bold">&minus;$${money(payment)}</span> per month. The minus sign just means the payment is cash flowing <em>out</em> of your pocket.</p>
+                <p class="mt-2 text-sm text-gray-600">With <strong>P/YR = 1</strong> a &ldquo;period&rdquo; is whatever you make it &mdash; here, one month. Because you feed the calculator the same periodic rate and period count that Excel gets, the two work identically, and your calculator is left in the same state for every other class.</p>
             </div>`;
 
             // 4. Excel formula
@@ -544,7 +546,16 @@
 
             <div class="mb-5">
                 <h4 class="text-xl font-semibold mb-2">Step 2 &mdash; Put time and rate on the same clock</h4>
-                <p class="text-gray-700 text-sm">Mortgage payments are monthly, so every input must be monthly. <span class="font-mono">N = years &times; 12</span>. On the HP 10bii+ set <span class="font-mono">P/YR = 12</span> and enter the <em>annual</em> rate as I/YR &mdash; the calculator divides for you. In Excel there is no P/YR, so you divide yourself: <span class="font-mono">rate/12</span>.</p>
+                <p class="text-gray-700 text-sm mb-2">Mortgage payments are monthly, so every input must be monthly: <span class="font-mono">N = years &times; 12</span> and <span class="font-mono">I/YR = annual rate &divide; 12</span>.</p>
+                <p class="text-gray-700 text-sm mb-2"><strong>Always leave P/YR = 1 on the HP 10bii+.</strong> P/YR is only a convenience that divides the rate for you, and it costs more than it saves: it makes the calculator take different inputs than Excel, and it stays set until you change it back, so it quietly corrupts the next problem you work &mdash; in this class or any other. Do the division yourself and the calculator and the spreadsheet take <em>identical</em> inputs.</p>
+                <table class="w-full text-sm border-collapse">
+                    <thead><tr class="bg-gray-200 text-left"><th class="p-2 border">Input</th><th class="p-2 border">HP 10bii+ (P/YR = 1)</th><th class="p-2 border">Excel</th></tr></thead>
+                    <tbody>
+                        <tr><td class="p-2 border font-semibold">Periods</td><td class="p-2 border font-mono">N = years &times; 12</td><td class="p-2 border font-mono">nper = years*12</td></tr>
+                        <tr class="bg-gray-50"><td class="p-2 border font-semibold">Rate</td><td class="p-2 border font-mono">I/YR = annual &divide; 12</td><td class="p-2 border font-mono">rate = annual/12</td></tr>
+                    </tbody>
+                </table>
+                <p class="text-gray-700 text-sm mt-2">Key the rate in as <span class="font-mono">annual &divide; 12 =</span> and let the calculator hold the full decimal, rather than writing it down and retyping it. Rounding to four decimal places only moves the payment by a dime or two, but it is one less step and one less place to slip.</p>
             </div>
 
             <div class="mb-5">
@@ -570,10 +581,10 @@
             <div>
                 <h4 class="text-xl font-semibold mb-2">Quick reference &mdash; HP 10bii+</h4>
                 <div class="keypad bg-gray-200 p-3 rounded-lg text-sm">
-                    <p class="font-mono col-span-2">12 [SHIFT] [P/YR]</p>
+                    <p class="font-mono col-span-2">1 [SHIFT] [P/YR]</p>
                     <p class="font-mono col-span-2">[SHIFT] [C ALL]</p>
                     <p class="font-mono">years &times; 12</p><p>[N]</p>
-                    <p class="font-mono">annual rate</p><p>[I/YR]</p>
+                    <p class="font-mono">annual rate &divide; 12</p><p>[I/YR]</p>
                     <p class="font-mono">loan amount</p><p>[PV]</p>
                     <p class="font-mono">balloon [+/-]</p><p>[FV]</p>
                     <p class="font-mono font-bold">Solve:</p><p class="font-bold">[PMT]</p>
