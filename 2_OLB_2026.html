@@ -676,7 +676,7 @@
             const at = askedMonth();
             return `<div class="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                 <h4 class="text-lg font-semibold text-indigo-900 mb-1">The big idea</h4>
-                <p class="text-sm text-indigo-900">The outstanding balance is simply <strong>the amount that would settle the loan today</strong> &mdash; the cheque the borrower would have to write to walk away, right now, at month ${at}.</p>
+                <p class="text-sm text-indigo-900">The outstanding balance is <strong>everything the borrower still owes, converted into one present value cash flow</strong> at month ${at}.</p>
                 <p class="text-sm text-indigo-900 mt-2">${structureBlurb()}</p>
                 <p class="text-sm text-indigo-900 mt-2">There are four ways to land on that number, and they always agree. Work through the tabs below &mdash; if two of them disagree, one of your inputs is wrong.</p>
             </div>`;
@@ -739,7 +739,7 @@
             const pay = Math.abs(state.monthlyPayment);
             const rate = (monthlyRate() * 100).toFixed(4);
             return `
-            <p class="text-gray-700 text-sm mb-3">Now start at day one and look <strong>back</strong> over what has happened. The borrower took the loan, then made ${at} payments. Roll the loan forward ${at} months with interest piling on, take off what the payments have covered, and whatever is left over at month ${at} is the balance. It is the same question as asking &ldquo;if the loan were cut short right here, what lump sum would settle it?&rdquo;</p>
+            <p class="text-gray-700 text-sm mb-3">Now start at day one and look <strong>back</strong> over what has happened. The borrower took the loan, then made ${at} payments. Roll the loan forward ${at} months with interest piling on, take off what the payments have covered, and whatever is left over at month ${at} is the balance. It is the same question as asking what balloon payment would exist if the loan term were shortened to the length of time between origination and repayment.</p>
             <div class="border border-gray-200 rounded-lg p-2 bg-white">${buildCashflowSVG('fv', at, true)}</div>
             ${sliderHTML()}
             <h5 class="font-semibold text-gray-800 mt-4 mb-1">On the HP 10bii+</h5>
@@ -852,7 +852,7 @@
             const pay = Math.abs(state.monthlyPayment);
             const rate = (monthlyRate() * 100).toFixed(4);
             return `
-            <p class="text-gray-700 text-sm mb-3">The HP 10bii+ can build that whole table internally and jump straight to the row you want. It is the quickest route once you trust it &mdash; but it only tells you the answer, not the story, so learn the first three ways first.</p>
+            <p class="text-gray-700 text-sm mb-3">The HP 10bii+ can build that whole table internally and report any stretch of it you ask for. It is worth knowing, but of the four routes it is the <strong>least preferred</strong>: it takes more keystrokes than either of the two shortcuts, there are more steps in which to slip, and its answer is hard to check unless you have already worked the problem another way. Treat it as something to confirm an answer with, not to find one.</p>
             <h5 class="font-semibold text-gray-800 mt-3 mb-1">Step one &mdash; describe the loan</h5>
             <div class="grid grid-cols-2 gap-2 bg-gray-200 p-3 rounded-lg text-sm">
                 <p class="font-mono col-span-2 font-bold">1 [SHIFT] [P/YR]</p>
@@ -863,14 +863,15 @@
                 <p class="font-mono">${pay.toFixed(2)} [+/-]</p><p>[PMT]</p>
             </div>
             <p class="text-xs text-gray-600 mt-1">This is the one place you use the full ${termMonths()} months rather than the months gone by &mdash; you are describing the whole loan, then asking about a point inside it.</p>
-            <h5 class="font-semibold text-gray-800 mt-4 mb-1">Step two &mdash; ask for the period you care about</h5>
-            <p class="text-sm text-gray-700">Open the amortisation function with <span class="font-mono bg-gray-200 px-1 rounded">[SHIFT] [AMORT]</span> and give it the range of months you want summarised &mdash; here, month <strong>1</strong> through month <strong>${at}</strong>. Pressing <span class="font-mono bg-gray-200 px-1 rounded">[=]</span> then steps through three answers in turn:</p>
+            <h5 class="font-semibold text-gray-800 mt-4 mb-1">Step two &mdash; ask for the stretch of payments you care about</h5>
+            <p class="text-sm text-gray-700">Open the amortisation function with <span class="font-mono bg-gray-200 px-1 rounded">[SHIFT] [AMORT]</span>. It wants <strong>two</strong> numbers: the <strong>first</strong> payment in the stretch you want summarised, and the <strong>last</strong>. Pressing <span class="font-mono bg-gray-200 px-1 rounded">[=]</span> then steps through three answers about that stretch:</p>
             <ul class="list-disc list-inside text-sm text-gray-700 mt-2 space-y-1">
-                <li><strong>PRIN</strong> &mdash; how much of the loan those payments actually paid off</li>
+                <li><strong>PRIN</strong> &mdash; how much of the loan was paid off across those payments</li>
                 <li><strong>INT</strong> &mdash; how much of them went on interest</li>
-                <li><strong>BAL</strong> &mdash; what is still owed at the end of that range. <span class="font-semibold">This is the outstanding balance.</span></li>
+                <li><strong>BAL</strong> &mdash; what is still owed once the <em>last</em> one has been made. <span class="font-semibold">This is the outstanding balance.</span></li>
             </ul>
-            <p class="text-sm text-gray-700 mt-3">For this loan that last figure reads <span class="font-mono font-bold">$${money(balanceByPresentValue(at))}</span>, matching all three of the other methods.</p>
+            <p class="text-sm text-gray-700 mt-3">Only PRIN and INT depend on where the stretch begins. <strong>BAL depends solely on where it ends</strong>, so if the balance is all you need, the first number does not matter. The least fiddly thing is to enter the same month twice &mdash; here <span class="font-mono font-bold">${at}</span> and <span class="font-mono font-bold">${at}</span> &mdash; which reports the interest and principal for that single payment and the balance immediately after it. Enter <span class="font-mono">1</span> through <span class="font-mono">${at}</span> instead and BAL is identical; what changes is that PRIN and INT now cover the whole life of the loan so far.</p>
+            <p class="text-sm text-gray-700 mt-2">Either way BAL reads <span class="font-mono font-bold">$${money(balanceByPresentValue(at))}</span>, matching all three of the other methods.</p>
             <div class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900">
                 <strong>Worth knowing:</strong> the exact key sequence for entering the range differs a little between calculator models and firmware. If your handset does not respond as described, check the amortisation page of its manual &mdash; the three outputs and their order are the same either way.
             </div>`;
@@ -935,7 +936,7 @@
             return `<h3 class="text-2xl font-bold mb-4">Concept Guide: Outstanding Loan Balance</h3>
 
             <div class="mb-5 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
-                <p class="text-sm text-indigo-900"><strong>The balance is the pay-off cheque.</strong> If the borrower wanted to clear the loan today, what one amount would do it? That is the outstanding balance. Everything below is just a different route to the same number.</p>
+                <p class="text-sm text-indigo-900"><strong>The balance is what the borrower still owes, converted into one present value cash flow.</strong> Everything below is just a different route to that same number.</p>
             </div>
 
             <div class="mb-5">
@@ -949,21 +950,23 @@
                     <thead><tr class="bg-gray-200 text-left"><th class="p-2 border">Route</th><th class="p-2 border">What you are asking</th><th class="p-2 border">Solve for</th></tr></thead>
                     <tbody>
                         <tr><td class="p-2 border font-semibold">Look forward</td><td class="p-2 border">What is everything still owed worth today?</td><td class="p-2 border font-mono">PV</td></tr>
-                        <tr class="bg-gray-50"><td class="p-2 border font-semibold">Look back</td><td class="p-2 border">If the loan stopped right here, what would settle it?</td><td class="p-2 border font-mono">FV</td></tr>
+                        <tr class="bg-gray-50"><td class="p-2 border font-semibold">Look back</td><td class="p-2 border">If the loan stopped right here, what balloon payment would settle it?</td><td class="p-2 border font-mono">FV</td></tr>
                         <tr><td class="p-2 border font-semibold">Amortisation table</td><td class="p-2 border">What does the bank's own ledger say this month?</td><td class="p-2 border">read the row</td></tr>
                         <tr class="bg-gray-50"><td class="p-2 border font-semibold">Calculator AMORT</td><td class="p-2 border">Same table, built for you</td><td class="p-2 border">read BAL</td></tr>
                     </tbody>
                 </table>
-                <p class="text-gray-700 text-sm">Use a second route to check the first. If they disagree, an input is wrong &mdash; almost always the number of months.</p>
+                <p class="text-gray-700 text-sm">Use a second route to check the first. If they disagree, one of your inputs is wrong &mdash; the traps below are where to look.</p>
             </div>
 
             <div class="mb-5">
-                <h4 class="text-xl font-semibold mb-2">The trap: which months?</h4>
-                <p class="text-gray-700 text-sm mb-2">Nearly every wrong answer comes from putting the wrong count into N. It depends on which way you are looking:</p>
-                <ul class="list-disc list-inside text-sm text-gray-700 space-y-1">
-                    <li><strong>Looking forward</strong> &rarr; the months <em>still to come</em>.</li>
-                    <li><strong>Looking back</strong> &rarr; the months <em>already paid</em>.</li>
-                    <li><strong>Using AMORT</strong> &rarr; the <em>whole term</em>, because you are describing the entire loan before asking about a point inside it.</li>
+                <h4 class="text-xl font-semibold mb-2">The traps</h4>
+                <p class="text-gray-700 text-sm mb-2">Wrong answers cluster around a handful of mistakes. Check these first:</p>
+                <ul class="list-disc list-inside text-sm text-gray-700 space-y-2">
+                    <li><strong>The wrong count of months.</strong> Looking forward wants the months <em>still to come</em>; looking back wants the months <em>already paid</em>; AMORT wants the <em>whole term</em>, because there you describe the entire loan before asking about a point inside it.</li>
+                    <li><strong>PV and FV swapping places.</strong> This one catches people out on the look-back method, because there the roles are not where you expect. <em>FV is today</em> &mdash; the balance you are solving for, at the far end of the months already paid. <em>PV is the past</em> &mdash; the loan as it stood on the day it was taken out. Put today's date on PV and you have asked a different question entirely. Looking forward the roles are the other way round: PV is today's balance and FV is the balloon still sitting at the end of the term.</li>
+                    <li><strong>Forgetting the balloon.</strong> If anything is still owed at the end of the term, it is part of what is owed today. Leaving FV at zero quietly answers for a loan that pays itself off.</li>
+                    <li><strong>Mixing months and years.</strong> The count of periods and the rate have to agree. Months in N means the annual rate divided by 12 in I/YR.</li>
+                    <li><strong>Answering with a number already on the screen.</strong> The payment, the original loan and the balloon are all in front of you, and none of them is the balance you were asked for.</li>
                 </ul>
             </div>
 
