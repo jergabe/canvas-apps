@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loan Balance Calculator (2026)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0; top: 0;
+            width: 100%; height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 94%;
+            max-width: 860px;
+            max-height: 90vh;
+            overflow-y: auto;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2), 0 6px 20px 0 rgba(0,0,0,0.19);
+            animation: animatetop 0.4s;
+        }
+        @keyframes animatetop {
+            from { top: -300px; opacity: 0; }
+            to   { top: 0; opacity: 1; }
+        }
+        .close-button {
+            color: #aaa; float: right;
+            font-size: 28px; font-weight: bold; line-height: 1;
+        }
+        .close-button:hover, .close-button:focus { color: #000; cursor: pointer; }
+
+        .gif-frame { width: 260px; height: 260px; object-fit: contain; }
+
+        /* --- Tabs --- */
+        .tab-btn {
+            border-bottom: 3px solid transparent;
+            transition: all 0.15s ease-in-out;
+        }
+        .tab-btn.active {
+            border-bottom-color: #4F46E5;
+            color: #4F46E5;
+            background-color: #EEF2FF;
+        }
+
+        /* --- Cash flow diagram animation --- */
+        .cf-draw {
+            stroke-dasharray: var(--len, 300);
+            stroke-dashoffset: var(--len, 300);
+        }
+        .cf-animate .cf-draw { animation: cfDraw 0.7s ease-out forwards; }
+        @keyframes cfDraw { to { stroke-dashoffset: 0; } }
+
+        .cf-fade { opacity: 0; }
+        .cf-animate .cf-fade { animation: cfFade 0.45s ease-out forwards; }
+        @keyframes cfFade { to { opacity: 1; } }
+
+        /* With animation disabled (slider dragging) everything is simply visible. */
+        .cf-static .cf-draw { stroke-dashoffset: 0; }
+        .cf-static .cf-fade { opacity: 1; }
+
+        .amort-table th, .amort-table td {
+            padding: 6px 8px;
+            border: 1px solid #e5e7eb;
+            text-align: right;
+            white-space: nowrap;
+        }
+        .amort-table th { background-color: #f3f4f6; text-align: center; }
+        .amort-table tr.subject-row td { background-color: #DCFCE7; font-weight: 700; }
+        .amort-table tr.gap-row td { text-align: center; color: #9ca3af; background: #fafafa; }
+        .formula-cell { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.72rem; color: #4338CA; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+            <header class="text-center mb-6">
+                <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">Loan Balance Calculator</h1>
+                <p class="text-gray-600 mt-2">Calculate the outstanding loan balance at a specific point in time!</p>
+            </header>
+
+            <div class="mb-6 flex flex-col sm:flex-row justify-center gap-3">
+                <button id="concept-guide-btn" class="bg-amber-500 text-white font-semibold py-2 px-5 rounded-md hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-400 transition duration-150 ease-in-out">📘 Concept Guide</button>
+                <button id="hint-btn" class="bg-sky-600 text-white font-semibold py-2 px-5 rounded-md hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition duration-150 ease-in-out">💡 Give Me a Hint</button>
+                <button id="walkthrough-btn" class="bg-gray-600 text-white font-semibold py-2 px-5 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition duration-150 ease-in-out">🧭 Show Walkthrough</button>
+            </div>
+
+            <div id="problem-container" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-lg text-gray-700">Loan Amount:</h3>
+                        <p id="loan-amount" class="text-2xl font-bold text-indigo-600"></p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-lg text-gray-700">Mortgage Structure:</h3>
+                        <p id="mortgage-structure" class="text-xl font-bold text-indigo-600"></p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-lg text-gray-700">Annual Interest Rate:</h3>
+                        <p id="interest-rate" class="text-2xl font-bold text-indigo-600"></p>
+                    </div>
+                    <div id="balloon-payment-display" class="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+                        <h3 class="font-semibold text-lg text-red-800">End-of-Term Balloon Payment:</h3>
+                        <p id="balloon-payment-amount" class="text-2xl font-bold text-red-600"></p>
+                    </div>
+                </div>
+
+                <div class="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <h3 class="font-semibold text-lg text-yellow-800">Calculate Balance At:</h3>
+                    <p id="balance-period" class="text-2xl font-bold text-yellow-600"></p>
+                </div>
+
+                <div class="mt-6">
+                    <label for="student-answer" class="block text-lg font-medium text-gray-700">Your Calculated Outstanding Loan Balance ($):</label>
+                    <div class="mt-2 flex flex-col sm:flex-row items-center gap-4">
+                        <input type="number" id="student-answer" class="flex-grow w-full px-4 py-2 text-lg border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Enter your answer">
+                        <button id="check-answer" class="w-full sm:w-auto bg-indigo-600 text-white font-bold py-2 px-6 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">Check Answer</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="feedback-container" class="mt-6 p-4 rounded-md text-center hidden">
+                <p id="feedback-text" class="text-xl font-bold"></p>
+                <div id="hint-text" class="text-md mt-2"></div>
+            </div>
+
+            <div class="mt-8 text-center">
+                <button id="new-problem" class="bg-green-600 text-white font-bold py-3 px-8 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out hidden">New Loan Problem</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Walkthrough / Concept Guide -->
+    <div id="walkthrough-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-modal-btn">&times;</span>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Modal for Gifs -->
+    <div id="gif-modal" class="modal">
+        <div class="modal-content bg-transparent border-0 shadow-none text-center">
+            <img id="gif-image" class="gif-frame mx-auto" src="" alt="Result GIF">
+        </div>
+    </div>
+
+    <script>
+        // --- TUTORING MEDIA ---
+        const CORRECT_GIFS = [
+            // Dancing kakapo
+            "https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExOG85bG80ZHFhdzR1djBqcXI0engzZTZxeWl3NTdzMWRpZjAxcGFsaSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/hTh9bSbUPWMWk/giphy.gif",
+            // Celebration (same gif used in the TVOM practice app)
+            "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExZGpzNmUyNjh1ZWN2eDFtY3p1amZ6N2dnMXQxajJrNGh5dzZreTBieiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/6yQq08riFOmeYkW3Xg/giphy.gif"
+        ];
+        const INCORRECT_GIF = "https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExdWdjbDYwdXE5d2lmcHJ3OHo4eDJ5aDJuYWFxNGp0MnJmeWYycTdudSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/hKQeYeYiH6O8Mvygh2/giphy.gif";
+
+        // --- DOM Element References ---
+        const loanAmountEl = document.getElementById('loan-amount');
+        const mortgageStructureEl = document.getElementById('mortgage-structure');
+        const interestRateEl = document.getElementById('interest-rate');
+        const balloonDisplayEl = document.getElementById('balloon-payment-display');
+        const balloonAmountEl = document.getElementById('balloon-payment-amount');
+        const balancePeriodEl = document.getElementById('balance-period');
+        const studentAnswerEl = document.getElementById('student-answer');
+        const checkAnswerBtn = document.getElementById('check-answer');
+        const newProblemBtn = document.getElementById('new-problem');
+        const feedbackContainer = document.getElementById('feedback-container');
+        const feedbackText = document.getElementById('feedback-text');
+        const hintText = document.getElementById('hint-text');
+        const conceptGuideBtn = document.getElementById('concept-guide-btn');
+        const hintBtn = document.getElementById('hint-btn');
+        const walkthroughBtn = document.getElementById('walkthrough-btn');
+        const walkthroughModal = document.getElementById('walkthrough-modal');
+        const gifModal = document.getElementById('gif-modal');
+        const gifImage = document.getElementById('gif-image');
+        const modalBody = document.getElementById('modal-body');
+
+        let state = {
+            loanAmount: 0,
+            annualRate: 0,
+            mortgageType: '',
+            loanTermYears: 0,
+            endTermBalloon: 0,
+            balancePeriodYears: 0,
+            monthlyPayment: 0,
+            correctAnswer: 0,
+            attempts: 0,
+            lastHint: null
+        };
+
+        // Walkthrough view state: which method tab is open, and which month the
+        // student is currently inspecting (draggable, starts on the asked month).
+        let walk = { tab: 'pv', atMonth: 0 };
+
+        // --- FORMATTING HELPERS ---
+        function money(num) {
+            return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        function money0(num) {
+            return num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+        }
+        function monthlyRate() { return state.annualRate / 100 / 12; }
+        function termMonths() { return state.loanTermYears * 12; }
+        function askedMonth() { return state.balancePeriodYears * 12; }
+
+        function fetchInterestRate() {
+            const baseRate = 6.5;
+            const randomFluctuation = (Math.random() * 1.5) - 0.75;
+            const rawRate = baseRate + randomFluctuation;
+            return Number((Math.round(rawRate / 0.125) * 0.125).toFixed(3));
+        }
+
+        // --- CORE CALCULATIONS -------------------------------------------------
+
+        function calculatePayment(pv, annualRate, termYears, type, fvFactor) {
+            const i = annualRate / 100 / 12;
+            const n = termYears * 12;
+            let fv_signed = 0;
+            switch (type) {
+                case 'Full': fv_signed = 0; break;
+                case 'Partial': fv_signed = -(pv * fvFactor); break;
+                case 'Interest Only': fv_signed = -pv; break;
+                case 'Negative': fv_signed = -(pv * fvFactor); break;
+            }
+            let payment = 0;
+            if (i === 0) {
+                payment = n > 0 ? -(pv + fv_signed) / n : 0;
+            } else {
+                const num = pv * Math.pow(1 + i, n) + fv_signed;
+                const den = (Math.pow(1 + i, n) - 1) / i;
+                payment = den !== 0 ? -num / den : 0;
+            }
+            return { payment: payment, fv: Math.abs(fv_signed) };
+        }
+
+        /** Method (a): what every remaining obligation is worth at `month`. */
+        function balanceByPresentValue(month) {
+            const i = monthlyRate();
+            const remaining = termMonths() - month;
+            if (remaining <= 0) return state.endTermBalloon;
+            if (i === 0) return state.loanAmount + (state.monthlyPayment * month);
+            const pvPayments = Math.abs(state.monthlyPayment) * ((1 - Math.pow(1 + i, -remaining)) / i);
+            const pvBalloon = state.endTermBalloon / Math.pow(1 + i, remaining);
+            return pvPayments + pvBalloon;
+        }
+
+        /** Method (b): roll the original loan forward, netting off the payments made. */
+        function balanceByFutureValue(month) {
+            const i = monthlyRate();
+            if (i === 0) return state.loanAmount + (state.monthlyPayment * month);
+            return state.loanAmount * Math.pow(1 + i, month)
+                 + state.monthlyPayment * ((Math.pow(1 + i, month) - 1) / i);
+        }
+
+        /** Method (c): walk the amortisation schedule one month at a time. */
+        function amortSchedule(uptoMonth) {
+            const i = monthlyRate();
+            const pay = Math.abs(state.monthlyPayment);
+            const rows = [];
+            let begin = state.loanAmount;
+            for (let m = 1; m <= uptoMonth; m++) {
+                const interest = begin * i;
+                const principal = pay - interest;
+                const end = begin - principal;
+                rows.push({ month: m, begin, payment: pay, interest, principal, end });
+                begin = end;
+            }
+            return rows;
+        }
+
+        function generateNewProblem() {
+            state.loanAmount = Math.round((Math.random() * (1500000 - 200000) + 200000) / 1000) * 1000;
+            state.annualRate = fetchInterestRate();
+
+            const amortizationOptions = [
+                { type: 'Full', term: 15 }, { type: 'Full', term: 20 }, { type: 'Full', term: 30 },
+                { type: 'Partial', term: 15 }, { type: 'Partial', term: 20 }, { type: 'Partial', term: 30 },
+                { type: 'Interest Only', term: 15 },
+                { type: 'Negative', term: 15 }, { type: 'Negative', term: 20 }, { type: 'Negative', term: 30 }
+            ];
+            const selectedOption = amortizationOptions[Math.floor(Math.random() * amortizationOptions.length)];
+
+            state.mortgageType = selectedOption.type;
+            state.loanTermYears = selectedOption.term;
+
+            let fvFactor = 0;
+            if (selectedOption.type === 'Partial') fvFactor = Math.random() * (0.9 - 0.1) + 0.1;
+            if (selectedOption.type === 'Negative') fvFactor = Math.random() * (1.9 - 1.1) + 1.1;
+
+            const paymentCalc = calculatePayment(state.loanAmount, state.annualRate, state.loanTermYears, state.mortgageType, fvFactor);
+            state.monthlyPayment = paymentCalc.payment;
+            state.endTermBalloon = paymentCalc.fv;
+
+            state.balancePeriodYears = Math.floor(Math.random() * (13 - 2 + 1)) + 2;
+            state.correctAnswer = balanceByPresentValue(askedMonth());
+
+            walk.atMonth = askedMonth();
+            walk.tab = 'pv';
+
+            resetUIForNewProblem();
+            updateProblemDisplay();
+        }
+
+        // --- ANSWER CHECKING ---------------------------------------------------
+
+        function checkAnswer() {
+            const studentAnswer = parseFloat(studentAnswerEl.value);
+            if (isNaN(studentAnswer)) { showFeedback("Please enter a valid number.", "error"); return; }
+
+            state.attempts++;
+            const difference = Math.abs(Math.abs(studentAnswer) - Math.abs(state.correctAnswer));
+            const isCorrect = difference <= 2.00;
+
+            if (isCorrect) {
+                showFeedback("Correct!", "success");
+                hintText.innerHTML = '';
+                lockProblem();
+                showGif(CORRECT_GIFS[Math.floor(Math.random() * CORRECT_GIFS.length)]);
+            } else if (state.attempts === 1) {
+                showFeedback("Incorrect. Try again!", "error");
+                provideHint();
+                diagnoseAnswer(studentAnswer);
+            } else {
+                showFeedback(`Incorrect. The balance after ${state.balancePeriodYears} years is $${money(state.correctAnswer)}.`, "error");
+                showGif(INCORRECT_GIF);
+                provideHint(true);
+                diagnoseAnswer(studentAnswer);
+                lockProblem();
+                appendWalkthroughPrompt();
+            }
+        }
+
+        /**
+         * Guided support: compares a wrong answer against the results the most
+         * common OLB errors produce, and names the error when one matches.
+         */
+        function diagnoseAnswer(studentAnswer) {
+            const given = Math.abs(studentAnswer);
+            const i = monthlyRate();
+            const total = termMonths();
+            const at = askedMonth();
+            const remaining = total - at;
+            const pay = Math.abs(state.monthlyPayment);
+            const balloon = state.endTermBalloon;
+            const correct = state.correctAnswer;
+
+            const pvOf = (n, fv) => pay * ((1 - Math.pow(1 + i, -n)) / i) + fv / Math.pow(1 + i, n);
+            const close = (a, b) => Math.abs(a - Math.abs(b)) <= Math.max(2.00, Math.abs(b) * 0.005);
+            const misses = [];
+            const add = (wrong, msg) => {
+                if (close(given, wrong) && !close(given, correct)) misses.push(msg);
+            };
+
+            // Used the whole term instead of only the payments that are left.
+            add(pvOf(total, balloon),
+                `That is the balance at the <strong>start</strong> of the loan, not after ${state.balancePeriodYears} years. Count only the payments <em>still to come</em>: ${remaining} of them, not ${total}.`);
+
+            // Counted the elapsed months as though they were the remaining ones.
+            if (at !== remaining) {
+                add(pvOf(at, balloon),
+                    `It looks like you used the <strong>${at} months already paid</strong> as N. You want the <strong>${remaining} months still to go</strong> instead.`);
+            }
+
+            // Left the balloon out of the picture.
+            if (balloon > 0) {
+                add(pvOf(remaining, 0),
+                    `It looks like you left the <strong>balloon</strong> out. The borrower still owes that lump sum at the end, so it is part of what they owe today.`);
+                add(balloon, `That is the <strong>balloon payment itself</strong>. The question asks what is owed after ${state.balancePeriodYears} years, which is earlier than that.`);
+            }
+
+            // Worked in years rather than months.
+            const annualI = state.annualRate / 100;
+            const yearsRemaining = state.loanTermYears - state.balancePeriodYears;
+            add(pay * ((1 - Math.pow(1 + annualI, -yearsRemaining)) / annualI) + balloon / Math.pow(1 + annualI, yearsRemaining),
+                `It looks like you worked in <strong>years</strong>. Everything here is monthly: ${remaining} months left, and the rate is the annual rate divided by 12.`);
+
+            // Answered with one of the numbers already on screen.
+            add(state.loanAmount,
+                `That is the <strong>original loan amount</strong>. ${state.mortgageType === 'Negative'
+                    ? 'On this loan the balance grows, so after some time it is more than that.'
+                    : 'Some of it has been paid off by now.'}`);
+            add(pay,
+                `That is the <strong>monthly payment</strong>, not the balance. The balance is the whole amount still owed.`);
+
+            if (misses.length > 0) {
+                hintText.innerHTML += `<div class="mt-3 text-left max-w-xl mx-auto p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900">${misses.map(m => `<p class="mb-1">&#9888;&#65039; ${m}</p>`).join('')}</div>`;
+            }
+        }
+
+        function appendWalkthroughPrompt() {
+            const btn = document.createElement('button');
+            btn.textContent = '🧭 Walk me through all four ways to get this';
+            btn.className = 'mt-4 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md';
+            btn.addEventListener('click', openWalkthrough);
+            hintText.appendChild(btn);
+        }
+
+        function provideHint(discloseAll = false) {
+            const at = askedMonth();
+            const remaining = termMonths() - at;
+            const rate = (monthlyRate() * 100).toFixed(4);
+            const pay = Math.abs(state.monthlyPayment);
+
+            if (discloseAll) {
+                let html = `<div class="text-left w-full max-w-lg mx-auto mt-4 p-4 bg-gray-50 rounded-lg">
+                    <p class="font-bold text-gray-800 mb-2">Looking forward &mdash; what is still owed:</p>
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-2">
+                        <div class="font-semibold text-gray-700">N (payments left):</div><div class="font-mono text-gray-900">${remaining}</div>
+                        <div class="font-semibold text-gray-700">I/YR (per month):</div><div class="font-mono text-gray-900">${rate}%</div>
+                        <div class="font-semibold text-gray-700">PMT:</div><div class="font-mono text-gray-900">-$${money(pay)}</div>`;
+                if (state.endTermBalloon > 0) {
+                    html += `<div class="font-semibold text-gray-700">FV (balloon):</div><div class="font-mono text-gray-900">-$${money(state.endTermBalloon)}</div>`;
+                } else {
+                    html += `<div class="font-semibold text-gray-700">FV:</div><div class="font-mono text-gray-900">0</div>`;
+                }
+                html += `</div><p class="text-sm text-gray-600 mt-2">Solve for PV &mdash; that is the balance.</p>
+                    <p class="font-bold text-gray-800 mb-2 mt-4">Looking back &mdash; the same answer the other way:</p>
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-2">
+                        <div class="font-semibold text-gray-700">N (months paid):</div><div class="font-mono text-gray-900">${at}</div>
+                        <div class="font-semibold text-gray-700">I/YR (per month):</div><div class="font-mono text-gray-900">${rate}%</div>
+                        <div class="font-semibold text-gray-700">PV (original loan):</div><div class="font-mono text-gray-900">$${money(state.loanAmount)}</div>
+                        <div class="font-semibold text-gray-700">PMT:</div><div class="font-mono text-gray-900">-$${money(pay)}</div>
+                    </div><p class="text-sm text-gray-600 mt-2">Solve for FV &mdash; same balance.</p></div>`;
+                hintText.innerHTML = html;
+                return;
+            }
+
+            const hints = [
+                { name: 'the number of payments still to come', value: `${remaining} months` },
+                { name: 'the rate per month', value: `${rate}%` },
+                { name: 'the monthly payment', value: `$${money(pay)}` }
+            ];
+            if (state.endTermBalloon > 0) {
+                hints.push({ name: 'the balloon still owed at the end', value: `$${money(state.endTermBalloon)}` });
+            }
+            let available = hints.filter(h => !state.lastHint || h.name !== state.lastHint.name);
+            if (available.length === 0) available = hints;
+            const pick = available[Math.floor(Math.random() * available.length)];
+            state.lastHint = pick;
+            hintText.innerHTML = `<span>Hint: check ${pick.name}. It should be ${pick.value}.</span>`;
+        }
+
+        function showOnDemandHint() {
+            const at = askedMonth();
+            const remaining = termMonths() - at;
+            const nudges = {
+                'Full': [
+                    `This loan pays itself off completely, so there is no lump sum at the end &mdash; the only thing left to value is the ${remaining} remaining payments.`,
+                    `After ${state.balancePeriodYears} years there are <strong>${remaining}</strong> payments still to come. That count, not the full ${termMonths()}, is what goes into N.`,
+                    `Early payments are mostly interest, so after ${state.balancePeriodYears} years less of the loan has been paid off than you might expect.`
+                ],
+                'Partial': [
+                    `Two things are still owed: the ${remaining} remaining payments <em>and</em> the balloon at the end. The balance today covers both.`,
+                    `After ${state.balancePeriodYears} years there are <strong>${remaining}</strong> payments still to come.`,
+                    `Because a balloon is still owed at the end, the balance stays higher than it would on a loan that fully pays itself off.`
+                ],
+                'Interest Only': [
+                    `On an interest-only loan the payment covers the interest and nothing else, so the balance never moves.`,
+                    `Think about what is being paid off each month here. The answer is a number already on your screen.`,
+                    `The balance after ${state.balancePeriodYears} years is the same as it was on day one.`
+                ],
+                'Negative': [
+                    `The payment here is smaller than the interest being charged, so the unpaid part is added on and the balance <strong>grows</strong>.`,
+                    `Expect an answer <em>larger</em> than the original loan. If yours is smaller, check the balloon you used.`,
+                    `Two things are still owed: the ${remaining} remaining payments and the balloon at the end &mdash; and that balloon is bigger than the original loan.`
+                ]
+            };
+            const pool = nudges[state.mortgageType] || nudges['Full'];
+            const nudge = pool[Math.floor(Math.random() * pool.length)];
+            feedbackContainer.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700');
+            feedbackContainer.classList.add('bg-sky-100', 'text-sky-800');
+            feedbackText.textContent = '💡 Hint';
+            hintText.innerHTML = `<span>${nudge}</span>`;
+        }
+
+        // --- CASH FLOW DIAGRAM -------------------------------------------------
+
+        const CF = { W: 780, AXIS_Y: 163, X0: 72, X1: 690 };
+
+        /** Vertical layout depends on whether a second arrow is stacked at the end. */
+        function cfLayout(hasBalloon) {
+            const pmtTip = 205;
+            const balloonTip = 252;
+            const bracket = hasBalloon ? 292 : 246;
+            return {
+                pmtTip, pmtLbl: pmtTip + 14, pmtSub: pmtTip + 25,
+                balloonTip, balloonLbl: balloonTip + 14, balloonSub: balloonTip + 25,
+                bracket, sweep: bracket + 26, caption: bracket + 46, height: bracket + 58
+            };
+        }
+
+        function arrowDown(x, color, label, sub, delay, tip, lblY, subY, shift) {
+            // `shift` moves the text clear of the arrow line when two arrows share a column.
+            const tx = x + (shift || 0);
+            const anchor = !shift ? 'middle' : (shift < 0 ? 'end' : 'start');
+            return `<g class="cf-fade" style="animation-delay:${delay}s">
+                <line x1="${x}" y1="${CF.AXIS_Y}" x2="${x}" y2="${tip - 9}" stroke="${color}" stroke-width="2.5"/>
+                <polygon points="${x - 5},${tip - 10} ${x + 5},${tip - 10} ${x},${tip}" fill="${color}"/>
+                <text x="${tx}" y="${lblY}" text-anchor="${anchor}" font-size="11" font-weight="700" fill="${color}">${label}</text>
+                ${sub ? `<text x="${tx}" y="${subY}" text-anchor="${anchor}" font-size="9.5" fill="#6b7280">${sub}</text>` : ''}
+            </g>`;
+        }
+
+        function arrowUp(x, color, label, sub, delay) {
+            const tip = CF.AXIS_Y - 62;
+            return `<g class="cf-fade" style="animation-delay:${delay}s">
+                <line x1="${x}" y1="${CF.AXIS_Y}" x2="${x}" y2="${tip + 9}" stroke="${color}" stroke-width="2.5"/>
+                <polygon points="${x - 5},${tip + 10} ${x + 5},${tip + 10} ${x},${tip}" fill="${color}"/>
+                <text x="${x}" y="${tip - 16}" text-anchor="middle" font-size="11" font-weight="700" fill="${color}">${label}</text>
+                ${sub ? `<text x="${x}" y="${tip - 5}" text-anchor="middle" font-size="9.5" fill="#6b7280">${sub}</text>` : ''}
+            </g>`;
+        }
+
+        /** Square bracket gathering every cash flow that is about to be moved. */
+        function gatherBracket(x1, x2, y, delay) {
+            const len = (x2 - x1) + 20;
+            return `<path class="cf-draw" style="--len:${len}; animation-delay:${delay}s"
+                     d="M ${x1} ${y - 9} L ${x1} ${y} L ${x2} ${y} L ${x2} ${y - 9}"
+                     fill="none" stroke="#059669" stroke-width="2" stroke-dasharray="${len}"/>`;
+        }
+
+        /** The single bold arrow carrying those cash flows to the valuation point. */
+        function sweep(fromX, toX, L, delay, label) {
+            const dir = toX > fromX ? 1 : -1;
+            const len = Math.abs(toX - fromX) + 70;
+            const midX = (fromX + toX) / 2;
+            return `<g>
+                <path class="cf-draw" style="--len:${len}; animation-delay:${delay}s"
+                      d="M ${fromX} ${L.bracket + 2} Q ${midX} ${L.sweep + 20} ${toX - dir * 10} ${L.sweep}"
+                      fill="none" stroke="#059669" stroke-width="2.4" stroke-dasharray="${len}"/>
+                <polygon class="cf-fade" style="animation-delay:${delay + 0.5}s"
+                         points="${toX - dir * 11},${L.sweep - 5} ${toX - dir * 11},${L.sweep + 5} ${toX},${L.sweep}" fill="#059669"/>
+                <text class="cf-fade" style="animation-delay:${delay + 0.5}s" x="${midX}" y="${L.caption}"
+                      text-anchor="middle" font-size="11" font-weight="700" fill="#047857">${label}</text>
+            </g>`;
+        }
+
+        function balanceMarker(x, value, caption, L, delay) {
+            const w = 168, h = 46, top = 12;
+            // Keep the box inside the canvas even when the valuation point sits at an edge;
+            // the dashed connector still drops from the true position on the timeline.
+            const bx = Math.min(Math.max(x, w / 2 + 4), CF.W - w / 2 - 4);
+            return `<g class="cf-fade" style="animation-delay:${delay}s">
+                <path d="M ${bx} ${top + h} L ${x} ${L.sweep}" stroke="#16A34A" stroke-width="1.6" stroke-dasharray="4 4" fill="none"/>
+                <rect x="${bx - w / 2}" y="${top}" width="${w}" height="${h}" rx="8" fill="#DCFCE7" stroke="#16A34A" stroke-width="2"/>
+                <text x="${bx}" y="${top + 18}" text-anchor="middle" font-size="10" font-weight="600" fill="#15803D">${caption}</text>
+                <text x="${bx}" y="${top + 36}" text-anchor="middle" font-size="15" font-weight="700" fill="#15803D">$${money(value)}</text>
+            </g>`;
+        }
+
+        /** Standard "time passes here" break drawn across the axis. */
+        function axisBreak(x, L) {
+            return `<g>
+                <rect x="${x - 9}" y="${CF.AXIS_Y - 6}" width="18" height="12" fill="#fff"/>
+                <line x1="${x - 8}" y1="${CF.AXIS_Y + 7}" x2="${x - 1}" y2="${CF.AXIS_Y - 7}" stroke="#374151" stroke-width="1.8"/>
+                <line x1="${x + 1}" y1="${CF.AXIS_Y + 7}" x2="${x + 8}" y2="${CF.AXIS_Y - 7}" stroke="#374151" stroke-width="1.8"/>
+                <text x="${x}" y="${L.pmtSub}" text-anchor="middle" font-size="9.5" fill="#9ca3af">and so on</text>
+            </g>`;
+        }
+
+        /**
+         * Builds the timeline. `mode` is 'pv' (look forward from the valuation
+         * month to the end of the loan) or 'fv' (look back from day one).
+         */
+        function buildCashflowSVG(mode, atMonth, animate) {
+            const total = termMonths();
+            const pay = Math.abs(state.monthlyPayment);
+            const balloon = state.endTermBalloon;
+            const balance = balanceByPresentValue(atMonth);
+            const showBalloon = mode === 'pv' && balloon > 0;
+            const L = cfLayout(showBalloon);
+
+            // Draw a few real months, break the axis, then pick up the tail.
+            let months, gapAfter = -1;
+            if (mode === 'pv') {
+                if (total - atMonth <= 5) {
+                    months = []; for (let m = atMonth + 1; m <= total; m++) months.push(m);
+                } else {
+                    months = [atMonth + 1, atMonth + 2, atMonth + 3, total - 1, total];
+                    gapAfter = 2;
+                }
+            } else {
+                if (atMonth <= 5) {
+                    months = []; for (let m = 1; m <= atMonth; m++) months.push(m);
+                } else {
+                    months = [1, 2, 3, atMonth - 1, atMonth];
+                    gapAfter = 2;
+                }
+            }
+
+            const anchorMonth = mode === 'pv' ? atMonth : 0;
+            const cols = months.length + 1;
+            const step = (CF.X1 - CF.X0) / Math.max(cols - 1, 1);
+            const xAt = idx => CF.X0 + idx * step;
+
+            let svg = `<svg viewBox="0 0 ${CF.W} ${L.height}" class="w-full h-auto ${animate ? 'cf-animate' : 'cf-static'}" role="img"
+                        aria-label="Cash flow timeline showing the loan balance at month ${atMonth}">`;
+
+            svg += `<line x1="${CF.X0 - 22}" y1="${CF.AXIS_Y}" x2="${CF.X1 + 30}" y2="${CF.AXIS_Y}" stroke="#374151" stroke-width="2"/>
+                    <polygon points="${CF.X1 + 30},${CF.AXIS_Y - 5} ${CF.X1 + 30},${CF.AXIS_Y + 5} ${CF.X1 + 42},${CF.AXIS_Y}" fill="#374151"/>
+                    <text x="${CF.X1 + 36}" y="${CF.AXIS_Y + 20}" text-anchor="middle" font-size="9.5" fill="#9ca3af">time</text>`;
+
+            let tickLabels = '';
+            [anchorMonth, ...months].forEach((m, idx) => {
+                const x = xAt(idx);
+                svg += `<line x1="${x}" y1="${CF.AXIS_Y - 7}" x2="${x}" y2="${CF.AXIS_Y + 7}" stroke="#374151" stroke-width="2"/>`;
+                // Drawn last, with a white halo, so no arrow or connector obscures it.
+                tickLabels += `<text x="${x}" y="${CF.AXIS_Y - 14}" text-anchor="middle" font-size="10" fill="#6b7280"
+                              stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" style="paint-order:stroke">month ${m}</text>`;
+            });
+
+            if (gapAfter >= 0) svg += axisBreak((xAt(gapAfter + 1) + xAt(gapAfter + 2)) / 2, L);
+
+            if (mode === 'pv') {
+                months.forEach((m, idx) => {
+                    const isLast = m === total;
+                    svg += arrowDown(xAt(idx + 1), '#4F46E5', `$${money0(pay)}`,
+                                     isLast ? 'last payment' : 'payment', 0.05 + idx * 0.06,
+                                     L.pmtTip, L.pmtLbl, L.pmtSub, (isLast && showBalloon) ? -9 : 0);
+                });
+                if (showBalloon) {
+                    // Stacked under the final payment: both fall due that same month.
+                    svg += arrowDown(xAt(months.length), '#DC2626', `$${money0(balloon)}`, 'balloon too', 0.42,
+                                     L.balloonTip, L.balloonLbl, L.balloonSub, 9);
+                }
+                svg += gatherBracket(xAt(1), xAt(months.length), L.bracket, 0.5);
+                svg += sweep(xAt(1), xAt(0), L, 0.72, `every one of these, valued back at month ${atMonth}`);
+                svg += balanceMarker(xAt(0), balance, `Balance owed at month ${atMonth}`, L, 1.15);
+            } else {
+                svg += arrowUp(xAt(0), '#6B7280', `$${money0(state.loanAmount)}`, 'loan received', 0.05);
+                months.forEach((m, idx) => {
+                    svg += arrowDown(xAt(idx + 1), '#4F46E5', `$${money0(pay)}`,
+                                     m === atMonth ? 'most recent' : 'payment', 0.12 + idx * 0.06,
+                                     L.pmtTip, L.pmtLbl, L.pmtSub);
+                });
+                svg += gatherBracket(xAt(0), xAt(months.length), L.bracket, 0.5);
+                svg += sweep(xAt(0), xAt(months.length), L, 0.72, `the loan and the payments, carried forward to month ${atMonth}`);
+                svg += balanceMarker(xAt(months.length), balance, `Balance owed at month ${atMonth}`, L, 1.15);
+            }
+
+            return svg + tickLabels + `</svg>`;
+        }
+
+        // --- WALKTHROUGH -------------------------------------------------------
+
+        function structureBlurb() {
+            switch (state.mortgageType) {
+                case 'Full':
+                    return `This loan fully pays itself off over ${state.loanTermYears} years, so nothing is left at the end. Everything the borrower still owes is sitting in the remaining monthly payments.`;
+                case 'Partial':
+                    return `This loan does not fully pay itself off. On top of the monthly payments there is a balloon of $${money(state.endTermBalloon)} due at the end, so the borrower owes both.`;
+                case 'Interest Only':
+                    return `Each payment on this loan covers the interest for that month and nothing more, so nothing is ever paid off the loan itself. Watch what that does to the balance.`;
+                case 'Negative':
+                    return `The payment on this loan is <em>smaller</em> than the interest charged each month. The shortfall gets added to what is owed, so the balance climbs and the balloon at the end &mdash; $${money(state.endTermBalloon)} &mdash; is larger than the original loan.`;
+                default: return '';
+            }
+        }
+
+        function bigIdeaHTML() {
+            const at = askedMonth();
+            return `<div class="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                <h4 class="text-lg font-semibold text-indigo-900 mb-1">The big idea</h4>
+                <p class="text-sm text-indigo-900">The outstanding balance is simply <strong>the amount that would settle the loan today</strong> &mdash; the cheque the borrower would have to write to walk away, right now, at month ${at}.</p>
+                <p class="text-sm text-indigo-900 mt-2">${structureBlurb()}</p>
+                <p class="text-sm text-indigo-900 mt-2">There are four ways to land on that number, and they always agree. Work through the tabs below &mdash; if two of them disagree, one of your inputs is wrong.</p>
+            </div>`;
+        }
+
+        function tabsHTML() {
+            const tabs = [
+                { id: 'pv', label: '1. Look forward' },
+                { id: 'fv', label: '2. Look back' },
+                { id: 'table', label: '3. Amortisation table' },
+                { id: 'amort', label: '4. Calculator AMORT' }
+            ];
+            return `<div class="flex flex-wrap border-b border-gray-200 mb-4">
+                ${tabs.map(t => `<button data-tab="${t.id}" class="tab-btn px-4 py-2 text-sm font-semibold text-gray-600 hover:text-indigo-600 ${walk.tab === t.id ? 'active' : ''}">${t.label}</button>`).join('')}
+            </div>`;
+        }
+
+        function sliderHTML() {
+            const at = walk.atMonth, asked = askedMonth(), total = termMonths();
+            return `<div class="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <div class="flex items-center justify-between mb-1">
+                    <label for="month-slider" class="text-sm font-semibold text-gray-700">Drag to value the loan at a different month:</label>
+                    <span class="text-sm font-bold text-indigo-700">month ${at} &nbsp;&rarr;&nbsp; $${money(balanceByPresentValue(at))}</span>
+                </div>
+                <input id="month-slider" type="range" min="1" max="${total - 1}" value="${at}" class="w-full accent-indigo-600">
+                <p class="text-xs text-gray-500 mt-1">This problem asks for month ${asked} (${state.balancePeriodYears} years).
+                    ${at !== asked ? `<button id="reset-month" class="ml-1 underline text-indigo-600 font-semibold">back to month ${asked}</button>` : 'You are there now.'}</p>
+            </div>`;
+        }
+
+        function tabPvHTML() {
+            const at = walk.atMonth, total = termMonths(), remaining = total - at;
+            const pay = Math.abs(state.monthlyPayment);
+            const rate = (monthlyRate() * 100).toFixed(4);
+            return `
+            <p class="text-gray-700 text-sm mb-3">Stand at month ${at} and look <strong>forward</strong>. Everything the borrower has not paid yet is still owed: ${remaining} more monthly payments${state.endTermBalloon > 0 ? `, plus the balloon at the very end` : ''}. Money owed later is worth less than money owed today, so each of those amounts gets carried back to month ${at}. Add them up and you have the balance.</p>
+            <div class="border border-gray-200 rounded-lg p-2 bg-white">${buildCashflowSVG('pv', at, true)}</div>
+            ${sliderHTML()}
+            <h5 class="font-semibold text-gray-800 mt-4 mb-1">On the HP 10bii+</h5>
+            <div class="grid grid-cols-2 gap-2 bg-gray-200 p-3 rounded-lg text-sm">
+                <p class="font-mono col-span-2 font-bold">1 [SHIFT] [P/YR] &nbsp;&nbsp;(leave it at 1)</p>
+                <p class="font-mono col-span-2">[SHIFT] [C ALL]</p>
+                <p class="font-mono">${remaining}</p><p>[N] &nbsp;&nbsp;(payments still to come)</p>
+                <p class="font-mono">${state.annualRate} &divide; 12 =</p><p>[I/YR] &nbsp;&nbsp;(= ${rate}% a month)</p>
+                <p class="font-mono">${pay.toFixed(2)} [+/-]</p><p>[PMT]</p>
+                <p class="font-mono">${state.endTermBalloon > 0 ? state.endTermBalloon.toFixed(2) + ' [+/-]' : '0'}</p><p>[FV] &nbsp;&nbsp;${state.endTermBalloon > 0 ? '(the balloon)' : '(nothing left at the end)'}</p>
+                <p class="font-mono font-bold">Solve for:</p><p class="font-bold">[PV]</p>
+            </div>
+            <p class="text-sm text-gray-600 mt-2">Answer: <span class="font-mono font-bold">$${money(balanceByPresentValue(at))}</span></p>
+            <h5 class="font-semibold text-gray-800 mt-4 mb-1">In Excel</h5>
+            <p class="text-sm text-gray-700 mb-1">Work out the payment in one cell &mdash; say <span class="font-mono">B5</span>:</p>
+            <p class="bg-gray-800 text-white font-mono p-3 rounded-lg break-all text-sm">=PMT(${state.annualRate}%/12, ${termMonths()}, ${state.loanAmount}, ${state.endTermBalloon > 0 ? '-' + state.endTermBalloon.toFixed(2) : '0'})</p>
+            <p class="text-sm text-gray-700 mt-2 mb-1">Then read the balance off it:</p>
+            <p class="bg-gray-800 text-white font-mono p-3 rounded-lg break-all text-sm">=PV(${state.annualRate}%/12, ${remaining}, B5, ${state.endTermBalloon > 0 ? '-' + state.endTermBalloon.toFixed(2) : '0'})</p>
+            <p class="text-xs text-gray-600 mt-1">Point the second formula at the payment cell rather than retyping the rounded payment &mdash; a payment rounded to the nearest cent, multiplied out over ${remaining} months, can shift the balance by a dollar or so. The payment and the balloon are both money going out, so both are negative, which makes the balance come back positive.</p>`;
+        }
+
+        function tabFvHTML() {
+            const at = walk.atMonth;
+            const pay = Math.abs(state.monthlyPayment);
+            const rate = (monthlyRate() * 100).toFixed(4);
+            return `
+            <p class="text-gray-700 text-sm mb-3">Now start at day one and look <strong>back</strong> over what has happened. The borrower took the loan, then made ${at} payments. Roll the loan forward ${at} months with interest piling on, take off what the payments have covered, and whatever is left over at month ${at} is the balance. It is the same question as asking &ldquo;if the loan were cut short right here, what lump sum would settle it?&rdquo;</p>
+            <div class="border border-gray-200 rounded-lg p-2 bg-white">${buildCashflowSVG('fv', at, true)}</div>
+            ${sliderHTML()}
+            <h5 class="font-semibold text-gray-800 mt-4 mb-1">On the HP 10bii+</h5>
+            <div class="grid grid-cols-2 gap-2 bg-gray-200 p-3 rounded-lg text-sm">
+                <p class="font-mono col-span-2 font-bold">1 [SHIFT] [P/YR]</p>
+                <p class="font-mono col-span-2">[SHIFT] [C ALL]</p>
+                <p class="font-mono">${at}</p><p>[N] &nbsp;&nbsp;(payments already made)</p>
+                <p class="font-mono">${state.annualRate} &divide; 12 =</p><p>[I/YR] &nbsp;&nbsp;(= ${rate}% a month)</p>
+                <p class="font-mono">${state.loanAmount.toFixed(2)}</p><p>[PV] &nbsp;&nbsp;(the original loan)</p>
+                <p class="font-mono">${pay.toFixed(2)} [+/-]</p><p>[PMT]</p>
+                <p class="font-mono font-bold">Solve for:</p><p class="font-bold">[FV]</p>
+            </div>
+            <p class="text-sm text-gray-600 mt-2">The calculator shows <span class="font-mono font-bold">&minus;$${money(balanceByFutureValue(at))}</span>. It comes out negative because it is money still owed; read it as <span class="font-mono font-bold">$${money(balanceByFutureValue(at))}</span>.</p>
+            <h5 class="font-semibold text-gray-800 mt-4 mb-1">In Excel</h5>
+            <p class="text-sm text-gray-700 mb-1">With the payment sitting in <span class="font-mono">B5</span> as before:</p>
+            <p class="bg-gray-800 text-white font-mono p-3 rounded-lg break-all text-sm">=-FV(${state.annualRate}%/12, ${at}, B5, ${state.loanAmount})</p>
+            <p class="text-xs text-gray-600 mt-1">The minus sign at the front just flips the answer round so it reads as a positive balance.</p>
+            <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-900">
+                <strong>Check it against tab 1.</strong> Looking forward gave $${money(balanceByPresentValue(at))} and looking back gave $${money(balanceByFutureValue(at))}. Two different routes, same balance &mdash; that is your proof the inputs are right.
+            </div>`;
+        }
+
+        function tabTableHTML() {
+            const at = walk.atMonth;
+            const rows = amortSchedule(at);
+            const rate = (monthlyRate() * 100).toFixed(4);
+
+            // Show the opening rows, then the rows leading into the month asked about.
+            let shown = [];
+            if (rows.length <= 7) {
+                shown = rows.map(r => ({ r }));
+            } else {
+                shown = [{ r: rows[0] }, { r: rows[1] }, { r: rows[2] }, { gap: true },
+                         { r: rows[at - 3] }, { r: rows[at - 2] }, { r: rows[at - 1] }];
+            }
+
+            const body = shown.map(s => {
+                if (s.gap) return `<tr class="gap-row"><td colspan="6">&#183;&#183;&#183; fill the formulas down through the months in between &#183;&#183;&#183;</td></tr>`;
+                const r = s.r;
+                const isSubject = r.month === at;
+                return `<tr class="${isSubject ? 'subject-row' : ''}">
+                    <td class="text-center">${r.month}</td>
+                    <td>$${money(r.begin)}</td>
+                    <td>$${money(r.payment)}</td>
+                    <td>$${money(r.interest)}</td>
+                    <td>${r.principal < 0 ? '&minus;' : ''}$${money(Math.abs(r.principal))}</td>
+                    <td>$${money(r.end)}</td>
+                </tr>`;
+            }).join('');
+
+            const principalNote = state.mortgageType === 'Interest Only'
+                ? `<p class="text-sm text-gray-700 mt-3">Notice the <strong>principal</strong> column is exactly zero every month. The payment covers the interest and no more, so the ending balance never budges from the original loan.</p>`
+                : state.mortgageType === 'Negative'
+                ? `<p class="text-sm text-gray-700 mt-3">Notice the <strong>principal</strong> column is <em>negative</em> every month. The payment does not even cover the interest, so the shortfall is added on and the ending balance climbs.</p>`
+                : `<p class="text-sm text-gray-700 mt-3">Notice how small the <strong>principal</strong> column is in the early months and how it grows. The interest is charged on the balance, so as the balance falls, more of each payment goes to paying the loan down.</p>`;
+
+            return `
+            <p class="text-gray-700 text-sm mb-3">The third way builds the loan month by month, the way a bank actually runs it. Each month the interest is worked out on what is owed, the payment covers that interest first, and whatever is left over comes off the loan. Do that ${at} times and the ending balance on the last row <em>is</em> the answer.</p>
+
+            <h5 class="font-semibold text-gray-800 mt-4 mb-1">Setting it up in Excel</h5>
+            <p class="text-sm text-gray-700 mb-2">Put the loan details in the top corner first:</p>
+            <div class="bg-gray-100 p-3 rounded-lg text-sm grid grid-cols-12 gap-x-3 gap-y-1 mb-3">
+                <p class="font-mono col-span-2 sm:col-span-1">B1</p><p class="col-span-10 sm:col-span-11">loan amount &nbsp;<span class="text-gray-500">${money0(state.loanAmount)}</span></p>
+                <p class="font-mono col-span-2 sm:col-span-1">B2</p><p class="col-span-10 sm:col-span-11">annual rate &nbsp;<span class="text-gray-500">${state.annualRate}%</span></p>
+                <p class="font-mono col-span-2 sm:col-span-1">B3</p><p class="col-span-10 sm:col-span-11">term in months &nbsp;<span class="text-gray-500">${termMonths()}</span></p>
+                <p class="font-mono col-span-2 sm:col-span-1">B4</p><p class="col-span-10 sm:col-span-11">balloon owed at the end &nbsp;<span class="text-gray-500">${money0(state.endTermBalloon)}</span></p>
+                <p class="font-mono col-span-2 sm:col-span-1">B5</p><p class="col-span-10 sm:col-span-11"><span class="formula-cell">=PMT(B2/12, B3, B1, -B4)</span> &nbsp;the monthly payment</p>
+            </div>
+            <p class="text-sm text-gray-700 mb-2">Then head up the table and type these five formulas into the first month's row. Every one of them can be filled straight down:</p>
+            <div class="overflow-x-auto">
+            <table class="w-full text-xs amort-table mb-3">
+                <thead>
+                    <tr><th>Month</th><th>Beginning balance</th><th>Payment</th><th>Interest</th><th>Principal</th><th>Ending balance</th></tr>
+                    <tr>
+                        <td class="formula-cell text-center">1</td>
+                        <td class="formula-cell">=$B$1</td>
+                        <td class="formula-cell">=ABS($B$5)</td>
+                        <td class="formula-cell">=B8*$B$2/12</td>
+                        <td class="formula-cell">=C8-D8</td>
+                        <td class="formula-cell">=B8-E8</td>
+                    </tr>
+                    <tr>
+                        <td class="formula-cell text-center">=A8+1</td>
+                        <td class="formula-cell">=F8</td>
+                        <td class="formula-cell">=ABS($B$5)</td>
+                        <td class="formula-cell">=B9*$B$2/12</td>
+                        <td class="formula-cell">=C9-D9</td>
+                        <td class="formula-cell">=B9-E9</td>
+                    </tr>
+                </thead>
+            </table>
+            </div>
+            <p class="text-sm text-gray-700 mb-3">Only one cell differs between the two rows: the <strong>beginning balance</strong>. Month 1 starts from the loan itself; every month after that starts from wherever last month ended. Select the second row and fill it down until the Month column reads <strong>${at}</strong> &mdash; then read the ending balance off that row.</p>
+
+            <h5 class="font-semibold text-gray-800 mt-4 mb-1">What it looks like filled in</h5>
+            <div class="overflow-x-auto">
+            <table class="w-full text-xs amort-table">
+                <thead><tr><th>Month</th><th>Beginning balance</th><th>Payment</th><th>Interest</th><th>Principal</th><th>Ending balance</th></tr></thead>
+                <tbody>${body}</tbody>
+            </table>
+            </div>
+            <p class="text-sm text-gray-700 mt-2">Month ${at} is the highlighted row, and its ending balance is <strong>$${money(rows.length ? rows[rows.length - 1].end : state.loanAmount)}</strong> &mdash; the same figure both of the earlier methods gave.</p>
+            ${principalNote}
+            ${sliderHTML()}
+            <p class="text-xs text-gray-500 mt-2">Interest each month is worked out at ${rate}% &mdash; the annual rate divided by 12.</p>`;
+        }
+
+        function tabAmortHTML() {
+            const at = walk.atMonth;
+            const pay = Math.abs(state.monthlyPayment);
+            const rate = (monthlyRate() * 100).toFixed(4);
+            return `
+            <p class="text-gray-700 text-sm mb-3">The HP 10bii+ can build that whole table internally and jump straight to the row you want. It is the quickest route once you trust it &mdash; but it only tells you the answer, not the story, so learn the first three ways first.</p>
+            <h5 class="font-semibold text-gray-800 mt-3 mb-1">Step one &mdash; describe the loan</h5>
+            <div class="grid grid-cols-2 gap-2 bg-gray-200 p-3 rounded-lg text-sm">
+                <p class="font-mono col-span-2 font-bold">1 [SHIFT] [P/YR]</p>
+                <p class="font-mono col-span-2">[SHIFT] [C ALL]</p>
+                <p class="font-mono">${termMonths()}</p><p>[N] &nbsp;&nbsp;(the <em>whole</em> term, not the part gone by)</p>
+                <p class="font-mono">${state.annualRate} &divide; 12 =</p><p>[I/YR] &nbsp;&nbsp;(= ${rate}% a month)</p>
+                <p class="font-mono">${state.loanAmount.toFixed(2)}</p><p>[PV]</p>
+                <p class="font-mono">${pay.toFixed(2)} [+/-]</p><p>[PMT]</p>
+            </div>
+            <p class="text-xs text-gray-600 mt-1">This is the one place you use the full ${termMonths()} months rather than the months gone by &mdash; you are describing the whole loan, then asking about a point inside it.</p>
+            <h5 class="font-semibold text-gray-800 mt-4 mb-1">Step two &mdash; ask for the period you care about</h5>
+            <p class="text-sm text-gray-700">Open the amortisation function with <span class="font-mono bg-gray-200 px-1 rounded">[SHIFT] [AMORT]</span> and give it the range of months you want summarised &mdash; here, month <strong>1</strong> through month <strong>${at}</strong>. Pressing <span class="font-mono bg-gray-200 px-1 rounded">[=]</span> then steps through three answers in turn:</p>
+            <ul class="list-disc list-inside text-sm text-gray-700 mt-2 space-y-1">
+                <li><strong>PRIN</strong> &mdash; how much of the loan those payments actually paid off</li>
+                <li><strong>INT</strong> &mdash; how much of them went on interest</li>
+                <li><strong>BAL</strong> &mdash; what is still owed at the end of that range. <span class="font-semibold">This is the outstanding balance.</span></li>
+            </ul>
+            <p class="text-sm text-gray-700 mt-3">For this loan that last figure reads <span class="font-mono font-bold">$${money(balanceByPresentValue(at))}</span>, matching all three of the other methods.</p>
+            <div class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900">
+                <strong>Worth knowing:</strong> the exact key sequence for entering the range differs a little between calculator models and firmware. If your handset does not respond as described, check the amortisation page of its manual &mdash; the three outputs and their order are the same either way.
+            </div>`;
+        }
+
+        function renderWalkthroughBody() {
+            const tabRenderers = { pv: tabPvHTML, fv: tabFvHTML, table: tabTableHTML, amort: tabAmortHTML };
+            modalBody.innerHTML = `
+                <h3 class="text-2xl font-bold mb-1">Walkthrough</h3>
+                <p class="text-gray-600 mb-3">${state.loanTermYears}-Year ${state.mortgageType} Amortisation &mdash; balance after ${state.balancePeriodYears} years</p>
+                ${bigIdeaHTML()}
+                ${tabsHTML()}
+                <div id="tab-panel">${tabRenderers[walk.tab]()}</div>`;
+            wireWalkthrough();
+        }
+
+        function wireWalkthrough() {
+            modalBody.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => { walk.tab = btn.dataset.tab; renderWalkthroughBody(); });
+            });
+            const slider = modalBody.querySelector('#month-slider');
+            if (slider) {
+                slider.addEventListener('input', e => {
+                    walk.atMonth = parseInt(e.target.value, 10);
+                    refreshTabPanel(false);
+                });
+            }
+            const reset = modalBody.querySelector('#reset-month');
+            if (reset) {
+                reset.addEventListener('click', () => { walk.atMonth = askedMonth(); refreshTabPanel(false); });
+            }
+        }
+
+        /** Redraws just the open tab, keeping the slider handle under the cursor. */
+        function refreshTabPanel(animate) {
+            const tabRenderers = { pv: tabPvHTML, fv: tabFvHTML, table: tabTableHTML, amort: tabAmortHTML };
+            const panel = modalBody.querySelector('#tab-panel');
+            if (!panel) return;
+            panel.innerHTML = tabRenderers[walk.tab]();
+            if (!animate) {
+                panel.querySelectorAll('svg').forEach(s => { s.classList.remove('cf-animate'); s.classList.add('cf-static'); });
+            }
+            wireWalkthrough();
+            const slider = panel.querySelector('#month-slider');
+            if (slider) slider.focus();
+        }
+
+        function openWalkthrough() {
+            walk.atMonth = askedMonth();
+            renderWalkthroughBody();
+            walkthroughModal.style.display = 'flex';
+            modalBody.parentElement.scrollTop = 0;
+        }
+
+        function openConceptGuide() {
+            modalBody.innerHTML = buildConceptGuideHTML();
+            walkthroughModal.style.display = 'flex';
+            modalBody.parentElement.scrollTop = 0;
+        }
+
+        function buildConceptGuideHTML() {
+            return `<h3 class="text-2xl font-bold mb-4">Concept Guide: Outstanding Loan Balance</h3>
+
+            <div class="mb-5 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                <p class="text-sm text-indigo-900"><strong>The balance is the pay-off cheque.</strong> If the borrower wanted to clear the loan today, what one amount would do it? That is the outstanding balance. Everything below is just a different route to the same number.</p>
+            </div>
+
+            <div class="mb-5">
+                <h4 class="text-xl font-semibold mb-2">Why a balance is not just &ldquo;loan minus payments made&rdquo;</h4>
+                <p class="text-gray-700 text-sm">Adding up the payments and subtracting them from the loan gives the wrong answer, and usually badly wrong. Most of an early payment is rent on the money &mdash; interest &mdash; and only what is left over actually pays the loan down. After a few years a borrower has handed over a great deal of money and knocked a surprisingly small dent in what they owe.</p>
+            </div>
+
+            <div class="mb-5">
+                <h4 class="text-xl font-semibold mb-2">The four routes</h4>
+                <table class="w-full text-sm border-collapse mb-2">
+                    <thead><tr class="bg-gray-200 text-left"><th class="p-2 border">Route</th><th class="p-2 border">What you are asking</th><th class="p-2 border">Solve for</th></tr></thead>
+                    <tbody>
+                        <tr><td class="p-2 border font-semibold">Look forward</td><td class="p-2 border">What is everything still owed worth today?</td><td class="p-2 border font-mono">PV</td></tr>
+                        <tr class="bg-gray-50"><td class="p-2 border font-semibold">Look back</td><td class="p-2 border">If the loan stopped right here, what would settle it?</td><td class="p-2 border font-mono">FV</td></tr>
+                        <tr><td class="p-2 border font-semibold">Amortisation table</td><td class="p-2 border">What does the bank's own ledger say this month?</td><td class="p-2 border">read the row</td></tr>
+                        <tr class="bg-gray-50"><td class="p-2 border font-semibold">Calculator AMORT</td><td class="p-2 border">Same table, built for you</td><td class="p-2 border">read BAL</td></tr>
+                    </tbody>
+                </table>
+                <p class="text-gray-700 text-sm">Use a second route to check the first. If they disagree, an input is wrong &mdash; almost always the number of months.</p>
+            </div>
+
+            <div class="mb-5">
+                <h4 class="text-xl font-semibold mb-2">The trap: which months?</h4>
+                <p class="text-gray-700 text-sm mb-2">Nearly every wrong answer comes from putting the wrong count into N. It depends on which way you are looking:</p>
+                <ul class="list-disc list-inside text-sm text-gray-700 space-y-1">
+                    <li><strong>Looking forward</strong> &rarr; the months <em>still to come</em>.</li>
+                    <li><strong>Looking back</strong> &rarr; the months <em>already paid</em>.</li>
+                    <li><strong>Using AMORT</strong> &rarr; the <em>whole term</em>, because you are describing the entire loan before asking about a point inside it.</li>
+                </ul>
+            </div>
+
+            <div class="mb-5">
+                <h4 class="text-xl font-semibold mb-2">What the structure tells you before you start</h4>
+                <table class="w-full text-sm border-collapse mb-2">
+                    <thead><tr class="bg-gray-200 text-left"><th class="p-2 border">Structure</th><th class="p-2 border">Owed at the end</th><th class="p-2 border">So the balance over time&hellip;</th></tr></thead>
+                    <tbody>
+                        <tr><td class="p-2 border font-semibold">Full</td><td class="p-2 border">nothing</td><td class="p-2 border">falls, slowly at first, reaching zero</td></tr>
+                        <tr class="bg-gray-50"><td class="p-2 border font-semibold">Partial</td><td class="p-2 border">a balloon smaller than the loan</td><td class="p-2 border">falls, but stops short of zero</td></tr>
+                        <tr><td class="p-2 border font-semibold">Interest only</td><td class="p-2 border">the whole loan</td><td class="p-2 border">never moves at all</td></tr>
+                        <tr class="bg-gray-50"><td class="p-2 border font-semibold">Negative</td><td class="p-2 border">a balloon bigger than the loan</td><td class="p-2 border">climbs</td></tr>
+                    </tbody>
+                </table>
+                <p class="text-gray-700 text-sm">Glance at this before you compute anything. If the structure says the balance should be falling and your answer is above the original loan, you already know something is wrong.</p>
+            </div>
+
+            <div>
+                <h4 class="text-xl font-semibold mb-2">Keeping the calculator and Excel in step</h4>
+                <p class="text-gray-700 text-sm">Leave <strong>P/YR at 1</strong> on the HP 10bii+ and do the dividing yourself: months into N, and the annual rate divided by 12 into I/YR. The calculator then takes exactly the same numbers as Excel, and there is nothing left set for your next class.</p>
+            </div>`;
+        }
+
+        // --- DISPLAY / STATE ---------------------------------------------------
+
+        function updateProblemDisplay() {
+            loanAmountEl.textContent = `$${state.loanAmount.toLocaleString()}`;
+            mortgageStructureEl.textContent = `${state.loanTermYears}-Year, ${state.mortgageType} Amortization`;
+            interestRateEl.textContent = `${state.annualRate}%`;
+            balancePeriodEl.textContent = `${state.balancePeriodYears} Years`;
+
+            if (state.endTermBalloon > 0) {
+                balloonAmountEl.textContent = `$${money(state.endTermBalloon)}`;
+                balloonDisplayEl.classList.remove('hidden');
+            } else {
+                balloonDisplayEl.classList.add('hidden');
+            }
+        }
+
+        function resetUIForNewProblem() {
+            state.attempts = 0;
+            state.lastHint = null;
+            studentAnswerEl.value = '';
+            studentAnswerEl.disabled = false;
+            checkAnswerBtn.disabled = false;
+            checkAnswerBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+            checkAnswerBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            newProblemBtn.classList.add('hidden');
+            feedbackContainer.classList.add('hidden');
+            hintText.innerHTML = '';
+        }
+
+        function lockProblem() {
+            studentAnswerEl.disabled = true;
+            checkAnswerBtn.disabled = true;
+            checkAnswerBtn.classList.add('bg-gray-400', 'cursor-not-allowed');
+            checkAnswerBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+            newProblemBtn.classList.remove('hidden');
+        }
+
+        function showFeedback(message, type) {
+            feedbackText.textContent = message;
+            feedbackContainer.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700', 'bg-sky-100', 'text-sky-800');
+            if (type === 'success') feedbackContainer.classList.add('bg-green-100', 'text-green-700');
+            else feedbackContainer.classList.add('bg-red-100', 'text-red-700');
+        }
+
+        function showGif(url) {
+            gifImage.src = url;
+            gifModal.style.display = 'flex';
+            setTimeout(() => { gifModal.style.display = 'none'; }, 2500);
+        }
+
+        // --- EVENT WIRING ---
+        checkAnswerBtn.addEventListener('click', checkAnswer);
+        newProblemBtn.addEventListener('click', generateNewProblem);
+        studentAnswerEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkAnswer(); });
+        conceptGuideBtn.addEventListener('click', openConceptGuide);
+        hintBtn.addEventListener('click', showOnDemandHint);
+        walkthroughBtn.addEventListener('click', openWalkthrough);
+        document.getElementById('close-modal-btn').addEventListener('click', () => { walkthroughModal.style.display = 'none'; });
+        window.addEventListener('click', (event) => {
+            if (event.target === walkthroughModal) walkthroughModal.style.display = 'none';
+            if (event.target === gifModal) gifModal.style.display = 'none';
+        });
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { walkthroughModal.style.display = 'none'; gifModal.style.display = 'none'; }
+        });
+
+        window.onload = () => { generateNewProblem(); };
+    </script>
+</body>
+</html>
