@@ -217,21 +217,23 @@
          * Fee category labels. Everything the student sees about the two fee
          * boxes is drawn from here, so relabelling is a one-place change.
          * The headline names are the Regulation Z (Truth in Lending) terms;
-         * `plain` carries the plain-language reading of each, and `rule` says
-         * whether it counts toward the APR. The scenario cards show only the
-         * name and `plain`: deciding which fees enter the APR is the student's
-         * job, so `rule` appears only in the help material.
+         * `card` is the caption under each scenario card; `plain` is the
+         * plain-language reading used in the concept guide; `rule` says whether
+         * it counts toward the APR. Deciding which fees enter the APR is the
+         * student's job, so `rule` appears only in the help material.
          */
         const FEE_LABELS = {
             included: {
                 name: 'Prepaid Finance Charges',
                 short: 'prepaid finance charges',
+                card: 'including points',
                 plain: 'lending-specific fees',
                 rule: 'in the APR'
             },
             excluded: {
                 name: 'Real-Estate Related Fees',
                 short: 'real-estate related fees',
+                card: 'general transaction fees',
                 plain: 'general transaction fees',
                 rule: 'not in the APR'
             }
@@ -431,9 +433,9 @@
 
         function applyFeeLabels() {
             document.getElementById('included-fee-label').textContent = `${FEE_LABELS.included.name}:`;
-            document.getElementById('included-fee-tag').textContent = FEE_LABELS.included.plain;
+            document.getElementById('included-fee-tag').textContent = FEE_LABELS.included.card;
             document.getElementById('excluded-fee-label').textContent = `${FEE_LABELS.excluded.name}:`;
-            document.getElementById('excluded-fee-tag').textContent = FEE_LABELS.excluded.plain;
+            document.getElementById('excluded-fee-tag').textContent = FEE_LABELS.excluded.card;
         }
 
         function resetUIForNewProblem() {
