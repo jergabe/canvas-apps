@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Underwriting Calculations (2026)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+
+        .step-container { transition: all 0.3s ease-in-out; opacity: 1; }
+        .step-container.disabled { opacity: 0.5; pointer-events: none; }
+        .step-container.done { opacity: 0.85; }
+        .c-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #4F46E5; }
+        .choice { display: block; padding: 0.35rem 0.5rem; border-radius: 0.375rem; font-size: 0.925rem; cursor: pointer; }
+        .choice:hover { background-color: #EEF2FF; }
+        .choice input, fieldset label input { margin-right: 0.4rem; }
+        .borrower-card { background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 0.5rem; padding: 0.85rem 1rem; }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0; top: 0;
+            width: 100%; height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 94%;
+            max-width: 920px;
+            max-height: 90vh;
+            overflow-y: auto;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2), 0 6px 20px 0 rgba(0,0,0,0.19);
+            animation: animatetop 0.4s;
+        }
+        @keyframes animatetop {
+            from { top: -300px; opacity: 0; }
+            to   { top: 0; opacity: 1; }
+        }
+        .close-button { color: #aaa; float: right; font-size: 28px; font-weight: bold; line-height: 1; }
+        .close-button:hover, .close-button:focus { color: #000; cursor: pointer; }
+        .gif-frame { width: 260px; height: 260px; object-fit: contain; }
+
+        /* Worksheet tables, modelled on the class example spreadsheet */
+        .ws-h { font-size: 1.05rem; font-weight: 700; color: #1F2937; margin: 1.25rem 0 0.4rem; padding-bottom: 0.2rem; border-bottom: 2px solid #E0E7FF; }
+        .ws-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+        .ws-table th, .ws-table td { border: 1px solid #E5E7EB; padding: 5px 8px; vertical-align: top; }
+        .ws-table th { background-color: #F3F4F6; font-weight: 600; text-align: right; white-space: nowrap; }
+        .ws-table td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .ws-table td.how { color: #4B5563; font-size: 0.78rem; min-width: 12rem; }
+        .ws-table tr.subtotal td { background-color: #F9FAFB; }
+        .ws-table tr.ratio td { background-color: #EEF2FF; }
+        .guide-list { list-style: disc; padding-left: 1.25rem; font-size: 0.875rem; color: #374151; }
+        .guide-list li { margin-bottom: 0.3rem; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+            <header class="text-center mb-6">
+                <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">Underwriting Calculator</h1>
+                <p class="text-gray-600 mt-2">Work through the four Cs of credit, then decide whether to approve the loan.</p>
+            </header>
+
+            <div class="mb-6 flex flex-col sm:flex-row justify-center gap-3">
+                <button id="concept-guide-btn" class="bg-amber-500 text-white font-semibold py-2 px-5 rounded-md hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-400 transition duration-150 ease-in-out">📘 Concept Guide</button>
+                <button id="hint-btn" class="bg-sky-600 text-white font-semibold py-2 px-5 rounded-md hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition duration-150 ease-in-out">💡 Give Me a Hint</button>
+                <button id="walkthrough-btn" class="bg-gray-600 text-white font-semibold py-2 px-5 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition duration-150 ease-in-out">🧭 Show Walkthrough</button>
+            </div>
+
+            <div class="flex flex-col sm:flex-row sm:items-end gap-3 mb-5">
+                <label for="scenario-select" class="flex-grow text-sm font-semibold text-gray-700">Scenario
+                    <select id="scenario-select" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-base font-normal"></select>
+                </label>
+                <button id="restart-scenario" class="bg-white border border-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-md hover:bg-gray-50">Start over</button>
+                <button id="next-scenario" class="bg-indigo-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-indigo-700">Next scenario &rarr;</button>
+            </div>
+
+            <section class="border border-gray-200 rounded-xl p-5 bg-white">
+                <p id="scenario-tag" class="c-label"></p>
+                <h2 id="scenario-title" class="text-2xl font-bold text-gray-900 mt-1"></h2>
+                <p id="scenario-text" class="text-gray-700 mt-3 leading-relaxed"></p>
+                <div id="borrowers" class="grid gap-3 mt-4"></div>
+                <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
+                    <p class="font-semibold mb-1">Assumptions for every scenario</p>
+                    <ul class="list-disc list-inside space-y-0.5">
+                        <li>Student loans are 0% interest, repaid in 100 equal monthly payments.</li>
+                        <li>Where only a credit card balance is given, the minimum payment is 5% of the balance.</li>
+                        <li>Where property taxes are not given, assume 1.25% of the purchase price per year.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <div id="steps" class="mt-8 space-y-5"></div>
+
+            <div id="completion" class="mt-8 text-center" hidden>
+                <p class="text-2xl font-bold text-green-600 bg-green-50 p-4 rounded-lg">Scenario complete!</p>
+                <div id="summary" class="mt-4 overflow-x-auto"></div>
+                <button id="next-scenario-2" class="mt-4 bg-green-600 text-white font-bold py-3 px-8 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">Next scenario &rarr;</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Walkthrough / Concept Guide -->
+    <div id="walkthrough-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-modal-btn">&times;</span>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Modal for Gifs -->
+    <div id="gif-modal" class="modal">
+        <div class="modal-content bg-transparent border-0 shadow-none text-center">
+            <img id="gif-image" class="gif-frame mx-auto" src="" alt="Result GIF">
+        </div>
+    </div>
+
+    <script>
+        // --- TUTORING MEDIA ---
+        const CORRECT_GIFS = [
+            // Dancing kakapo
+            "https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExOG85bG80ZHFhdzR1djBqcXI0engzZTZxeWl3NTdzMWRpZjAxcGFsaSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/hTh9bSbUPWMWk/giphy.gif",
+            // Celebration (same gif used in the TVOM practice app)
+            "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExZGpzNmUyNjh1ZWN2eDFtY3p1amZ6N2dnMXQxajJrNGh5dzZreTBieiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/6yQq08riFOmeYkW3Xg/giphy.gif"
+        ];
+        const INCORRECT_GIF = "https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExdWdjbDYwdXE5d2lmcHJ3OHo4eDJ5aDJuYWFxNGp0MnJmeWYycTdudSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/hKQeYeYiH6O8Mvygh2/giphy.gif";
+
+        // ===================== SCENARIOS =====================
+        // The in-class example and Groups 1-6 from the workshop, then practice scenarios.
+        const SCENARIOS = [
+// ---------------- Workshop cases ----------------
+{ id:'class', title:'In-Class Example: Andrew', source:'workshop', purpose:'purchase', occupancy:'primary',
+  opener:'Andrew is in contract to purchase a single family primary residence in California.',
+  price:659500, appraisal:660000, loan:410000, rate:3.125, term:30, closing:9500,
+  taxes:{amount:4504, per:'half', note:'includes special assessment of $382 per semi-annual payment'}, insurance:{amount:545.40, per:'half', label:'Hazard insurance'},
+  borrowers:[{ name:'Andrew', job:'Associate Professor at University of California for 15 years', income:{type:'semimonthly', amount:3238},
+    assets:340780, assetLabel:'Verified assets', fico:[784,806,810], debts:[{kind:'student', balance:7865},{kind:'rentalLoss', payment:489}] }] },
+{ id:'g1', title:'Group 1: Sally & Sam', source:'workshop', purpose:'refi', occupancy:'primary',
+  opener:'Sally and Sam have applied to refinance their single family primary residence in San Diego. Refinance loans are underwritten the same way as purchases.',
+  payoff:480000, cashOut:50000, cashOutUse:'home improvements', appraisal:720000, rate:2.125, term:15, closing:5200,
+  taxes:{amount:6250, per:'year'}, insurance:{amount:2250, per:'year'},
+  borrowers:[
+    { name:'Sally', job:'Manager at Qualcomm for past 6 months', income:{type:'biweekly', amount:4225}, assets:42000, fico:[780,792,726],
+      debts:[{kind:'lease', payment:500, monthsLeft:9},{kind:'card', payment:600},{kind:'student', payment:200}] },
+    { name:'Sam', job:'Teacher at San Diego City Schools for past 15 years', income:{type:'monthly', amount:6875}, assets:25000, fico:[662,703,690],
+      debts:[{kind:'installment', label:'Car loan', payment:350, monthsLeft:9},{kind:'card', payment:300}] }] },
+{ id:'g2', title:'Group 2: Rachel', source:'workshop', purpose:'purchase', occupancy:'primary',
+  opener:'Rachel is buying her first home, a condo in Pacific Beach.',
+  price:600000, downPct:20, loan:480000, rate:2.75, term:30, closing:5500, taxes:{amount:625, per:'month'}, hoa:400,
+  borrowers:[{ name:'Rachel', job:'Real estate agent for two years', income:{type:'commission', years:[{year:2020, amount:96000},{year:2019, amount:105000}]},
+    assets:142000, fico:[784,806,810], debts:[{kind:'student', balance:15000},{kind:'lease', payment:425}] }] },
+{ id:'g3', title:'Group 3: Jack & Jill', source:'workshop', purpose:'refi', occupancy:'primary',
+  opener:'Jack and Jill have applied to refinance the current mortgage on their primary residence.',
+  payoff:510000, cashOut:0, appraisal:725000, rate:2.75, term:20, closing:2500,
+  taxes:{amount:3125, per:'half'}, insurance:{amount:1850, per:'year'},
+  borrowers:[
+    { name:'Jack', job:'Self-employed for past 1 year', selfEmployedYears:1, income:{type:'annual', amount:60000}, fico:[662,703,690],
+      debts:[{kind:'installment', label:'Car loan', payment:650},{kind:'card', payment:300},{kind:'student', payment:200}] },
+    { name:'Jill', job:'RN for Kaiser for past 15 years', income:{type:'annual', amount:115000}, assets:75000, fico:[780,792,726],
+      debts:[{kind:'installment', label:'Car loan', payment:450},{kind:'card', payment:150}] }] },
+{ id:'g4', title:'Group 4: Jasmin', source:'workshop', purpose:'purchase', occupancy:'second',
+  opener:'Jasmin is buying a second home in Bend, Oregon.',
+  price:725000, downPct:25, loan:543750, rate:2.875, term:30, closing:8500, taxes:{amount:14200, per:'year'}, insurance:{amount:9250, per:'year'}, primaryPITI:2742,
+  borrowers:[{ name:'Jasmin', job:'Airline pilot for past seven years', income:{type:'annual', amount:182000}, assets:215000, fico:[780,792,726],
+    debts:[{kind:'card', payment:400},{kind:'student', balance:15000},{kind:'alimony', payment:1200, monthsLeft:9}] }] },
+{ id:'g5', title:'Group 5: Shanna & Lauren', source:'workshop', purpose:'purchase', occupancy:'duplex',
+  opener:'Shanna and Lauren are buying a duplex in California. They plan to live in one unit and rent out the other.',
+  price:600000, loan:480000, rate:2.75, term:30, closing:6558, insurance:{amount:1625, per:'year'}, rentPerUnit:2350, unitsRented:1,
+  borrowers:[
+    { name:'Shanna', job:'Assistant Branch Manager at Bank of America', income:{type:'hourly', amount:35, hours:40}, assets:152000, fico:[680,692,670],
+      debts:[{kind:'installment', label:'Car payment', payment:350},{kind:'card', payment:400},{kind:'student', balance:15000}] },
+    { name:'Lauren', fico:[650,680,632], debts:[{kind:'card', payment:325}] }] },
+{ id:'g6', title:'Group 6: Jordyn (VA)', source:'workshop', purpose:'purchase', occupancy:'primary', va:true,
+  opener:'Jordyn, a veteran, is in contract to purchase her first home, a single family primary residence in California, financing 100% of the price with a VA loan.',
+  price:500000, loan:500000, rate:2.5, term:30, closing:4500, taxes:{amount:6250, per:'year'}, insurance:{amount:2500, per:'year'},
+  borrowers:[{ name:'Jordyn', job:'Electrician at SDG&E', income:{type:'monthly', amount:8250}, assets:20000, assetLabel:'Verified assets', fico:[780,758,792], debts:[] }] },
+
+// ---------------- New scenarios ----------------
+{ id:'n01', title:'Marcus', purpose:'purchase', occupancy:'primary',
+  opener:'Marcus is buying a single family home in Escondido as a primary residence.',
+  price:785000, appraisal:790000, loan:628000, rate:6.25, term:30, closing:11200, taxes:{amount:9813, per:'year'}, insurance:{amount:2160, per:'year'},
+  borrowers:[{ name:'Marcus', job:'Software engineer at Intuit for 6 years', income:{type:'biweekly', amount:7450}, assets:221000, fico:[742,755,761],
+    debts:[{kind:'installment', label:'Car loan', payment:540, monthsLeft:31},{kind:'card', payment:180}] }] },
+{ id:'n02', title:'Priya & Dev', purpose:'purchase', occupancy:'primary',
+  opener:'Priya and Dev are buying a townhome in Mira Mesa as their primary residence.',
+  price:845000, loan:676000, rate:6.5, term:30, closing:12400, taxes:{amount:5280, per:'half'}, insurance:{amount:1740, per:'year'}, hoa:385,
+  borrowers:[
+    { name:'Priya', job:'Pharmacist at Scripps for 8 years', income:{type:'annual', amount:168000}, assets:118000, fico:[778,790,801],
+      debts:[{kind:'installment', label:'Car loan', payment:610, monthsLeft:8},{kind:'card', payment:150}] },
+    { name:'Dev', job:'Civil engineer at Caltrans for 4 years', income:{type:'semimonthly', amount:4350}, assets:84000, fico:[731,744,752],
+      debts:[{kind:'lease', label:'Car lease', payment:465, monthsLeft:7},{kind:'student', balance:38000}] }] },
+{ id:'n03', title:'Tom', purpose:'purchase', occupancy:'primary',
+  opener:'Tom is buying a condo in Hillcrest as a primary residence and wants to put just 10% down.',
+  price:560000, downPct:10, loan:504000, rate:6.875, term:30, closing:8900, taxes:{amount:7000, per:'year'}, hoa:410,
+  borrowers:[{ name:'Tom', job:'Account manager at Cox Communications for 5 years', income:{type:'annual', amount:142000}, assets:198000, fico:[748,739,756],
+    debts:[{kind:'card', payment:220},{kind:'student', balance:21000}] }] },
+{ id:'n04', title:'Elena', purpose:'purchase', occupancy:'primary',
+  opener:'Elena is buying a single family home in Chula Vista as a primary residence.',
+  price:690000, loan:552000, rate:7.125, term:30, closing:10300, taxes:{amount:8625, per:'year'}, insurance:{amount:1980, per:'year'},
+  borrowers:[{ name:'Elena', job:'Dental hygienist for 9 years', income:{type:'hourly', amount:68, hours:40}, assets:188000, fico:[598,611,640],
+    debts:[{kind:'installment', label:'Car loan', payment:430, monthsLeft:40},{kind:'card', payment:90}] }] },
+{ id:'n05', title:'Carlos & Ana', purpose:'purchase', occupancy:'primary',
+  opener:'Carlos and Ana are buying a single family home in Santee. Ana is not currently working.',
+  price:740000, loan:592000, rate:6.625, term:30, closing:10800, taxes:{amount:9250, per:'year'}, insurance:{amount:2040, per:'year'},
+  borrowers:[
+    { name:'Carlos', job:'Firefighter with the City of San Diego for 12 years', income:{type:'biweekly', amount:6150}, assets:205000, fico:[724,736,741],
+      debts:[{kind:'installment', label:'Truck loan', payment:620, monthsLeft:44}] },
+    { name:'Ana', fico:[588,602,615], debts:[{kind:'card', balance:6400}] }] },
+{ id:'n06', title:'Grace (second home)', purpose:'purchase', occupancy:'second',
+  opener:'Grace is buying a second home in Palm Springs.',
+  price:615000, downPct:30, loan:430500, rate:6.75, term:30, closing:9100, taxes:{amount:7380, per:'year'}, insurance:{amount:3600, per:'year'}, hoa:290, primaryPITI:3380,
+  borrowers:[{ name:'Grace', job:'Orthopedic surgeon for 11 years', income:{type:'annual', amount:265000}, assets:298000, fico:[788,799,806],
+    debts:[{kind:'installment', label:'Car loan', payment:890, monthsLeft:28},{kind:'card', payment:350}] }] },
+{ id:'n07', title:'Kevin (cash-out refi)', purpose:'refi', occupancy:'primary',
+  opener:'Kevin has applied to refinance a single family primary residence in Oceanside and take cash out.',
+  payoff:452000, cashOut:110000, cashOutUse:'paying off a business line of credit', appraisal:655000, rate:6.875, term:30, closing:7600,
+  taxes:{amount:3940, per:'half'}, insurance:{amount:1890, per:'year'},
+  borrowers:[{ name:'Kevin', job:'Self-employed landscape contractor for past 6 years', selfEmployedYears:6, income:{type:'annual', amount:146000}, assets:61000, fico:[756,762,749],
+    debts:[{kind:'installment', label:'Truck loan', payment:780, monthsLeft:36},{kind:'card', payment:240}] }] },
+{ id:'n08', title:'Lisa', purpose:'purchase', occupancy:'primary',
+  opener:'Lisa is buying a single family home in Clairemont as a primary residence.',
+  price:850000, appraisal:865000, loan:680000, rate:6.375, term:30, closing:12500, taxes:{amount:5313, per:'half'}, insurance:{amount:2280, per:'year'},
+  borrowers:[{ name:'Lisa', job:'Product director at Illumina for 9 years', income:{type:'semimonthly', amount:7400}, assets:232000, fico:[772,781,768],
+    debts:[{kind:'student', balance:64000},{kind:'card', balance:9800},{kind:'installment', label:'Car loan', payment:515, monthsLeft:22}] }] },
+{ id:'n09', title:'Hector', purpose:'purchase', occupancy:'primary',
+  opener:'Hector is buying a single family home in El Cajon as a primary residence.',
+  price:595000, loan:476000, rate:6.75, term:30, closing:9800, taxes:{amount:7438, per:'year'}, insurance:{amount:2100, per:'year'},
+  borrowers:[{ name:'Hector', job:'Electrician (union journeyman) for 14 years', income:{type:'hourly', amount:64, hours:40}, assets:205000, fico:[688,701,712],
+    debts:[{kind:'installment', label:'Truck loan', payment:520, monthsLeft:50},{kind:'card', payment:180},{kind:'support', label:'Child support', payment:650, monthsLeft:84}] }] },
+{ id:'n10', title:'Monique', purpose:'purchase', occupancy:'primary',
+  opener:'Monique is buying a condo in Little Italy as a primary residence.',
+  price:730000, loan:584000, rate:6.5, term:30, closing:11200, taxes:{amount:9125, per:'year'}, hoa:620,
+  borrowers:[{ name:'Monique', job:'Attorney at a downtown firm for 7 years', income:{type:'annual', amount:178000}, assets:184000, fico:[752,767,744],
+    debts:[{kind:'student', balance:118000},{kind:'lease', label:'Car lease', payment:520, monthsLeft:26}] }] },
+{ id:'n11', title:'Ray & Dana (duplex)', purpose:'purchase', occupancy:'duplex',
+  opener:'Ray and Dana are buying a duplex in North Park. They will live in one unit and rent out the other.',
+  price:1150000, loan:920000, rate:6.625, term:30, closing:16800, insurance:{amount:3150, per:'year'}, rentPerUnit:3100, unitsRented:1,
+  borrowers:[
+    { name:'Ray', job:'Nurse practitioner at Sharp for 10 years', income:{type:'annual', amount:162000}, assets:146000, fico:[761,770,776],
+      debts:[{kind:'installment', label:'Car loan', payment:480, monthsLeft:19}] },
+    { name:'Dana', job:'High school counselor for 6 years', income:{type:'monthly', amount:7650}, assets:162000, fico:[744,739,758],
+      debts:[{kind:'student', balance:29000},{kind:'card', payment:190}] }] },
+{ id:'n12', title:'Sofia (commission)', purpose:'purchase', occupancy:'primary',
+  opener:'Sofia is buying a condo in Carlsbad as a primary residence.',
+  price:655000, loan:524000, rate:6.5, term:30, closing:9700, taxes:{amount:4094, per:'half'}, hoa:455,
+  borrowers:[{ name:'Sofia', job:'Medical device sales representative for 5 years', income:{type:'commission', years:[{year:2025, amount:148000},{year:2024, amount:171000}]},
+    assets:171000, fico:[737,729,745], debts:[{kind:'lease', label:'Car lease', payment:595, monthsLeft:14},{kind:'card', payment:240}] }] },
+{ id:'n13', title:'Wei (VA)', purpose:'purchase', occupancy:'primary', va:true,
+  opener:'Wei, a Navy veteran, is buying a single family primary residence in Murrieta, financing 100% of the price with a VA loan.',
+  price:636000, loan:636000, rate:6.25, term:30, closing:7200, taxes:{amount:7950, per:'year'}, insurance:{amount:1920, per:'year'},
+  borrowers:[{ name:'Wei', job:'Aircraft mechanic at NASSCO for 7 years', income:{type:'monthly', amount:12500}, assets:92000, fico:[702,715,698],
+    debts:[{kind:'installment', label:'Car loan', payment:560, monthsLeft:38},{kind:'card', payment:200}] }] },
+{ id:'n14', title:'James (VA)', purpose:'purchase', occupancy:'primary', va:true,
+  opener:'James, an Army veteran, is buying a condo in Oceanside as a primary residence, financing 100% of the price with a VA loan.',
+  price:525000, loan:525000, rate:6.125, term:30, closing:6300, taxes:{amount:6563, per:'year'}, hoa:340,
+  borrowers:[{ name:'James', job:'Police officer with the Oceanside PD for 5 years', income:{type:'biweekly', amount:4700}, assets:21500, fico:[694,708,719],
+    debts:[{kind:'installment', label:'Car loan', payment:410, monthsLeft:6},{kind:'card', payment:120}] }] },
+{ id:'n15', title:'Aisha (low appraisal)', purpose:'purchase', occupancy:'primary',
+  opener:'Aisha is buying a single family home in La Mesa as a primary residence. The appraisal came in below the contract price.',
+  price:875000, appraisal:830000, loan:700000, rate:6.5, term:30, closing:12600, taxes:{amount:10938, per:'year'}, insurance:{amount:2400, per:'year'},
+  borrowers:[{ name:'Aisha', job:'Data scientist at Qualcomm for 6 years', income:{type:'annual', amount:214000}, assets:252000, fico:[781,776,790],
+    debts:[{kind:'card', payment:200},{kind:'student', balance:32000}] }] },
+{ id:'n16', title:'Ben & Chloe (refi)', purpose:'refi', occupancy:'primary',
+  opener:'Ben and Chloe have applied to refinance the mortgage on their primary residence in Poway into a lower rate.',
+  payoff:688000, cashOut:0, appraisal:960000, rate:6.25, term:30, closing:6800, taxes:{amount:5320, per:'half'}, insurance:{amount:2450, per:'year'},
+  borrowers:[
+    { name:'Ben', job:'Self-employed photographer for past 18 months', selfEmployedYears:1.5, income:{type:'annual', amount:88000}, fico:[668,681,690],
+      debts:[{kind:'installment', label:'Car loan', payment:690, monthsLeft:41},{kind:'card', payment:380}] },
+    { name:'Chloe', job:'Physical therapist at Palomar Health for 12 years', income:{type:'annual', amount:142000}, assets:96000, fico:[766,758,772],
+      debts:[{kind:'card', payment:160}] }] },
+{ id:'n17', title:'Olivia', purpose:'purchase', occupancy:'primary',
+  opener:'Olivia is buying a single family home in Vista as a primary residence.',
+  price:720000, loan:576000, rate:6.625, term:30, closing:10500, insurance:{amount:1980, per:'year'},
+  borrowers:[{ name:'Olivia', job:'Registered nurse at Tri-City Medical Center for 11 years', income:{type:'hourly', amount:84, hours:36}, assets:198000, fico:[731,745,739],
+    debts:[{kind:'alimony', payment:1400, monthsLeft:8},{kind:'support', label:'Child support', payment:950, monthsLeft:62},{kind:'card', balance:4800}] }] },
+{ id:'n18', title:'Frank', purpose:'purchase', occupancy:'primary',
+  opener:'Frank is buying a single family home in Lakeside as a primary residence.',
+  price:640000, loan:512000, rate:6.5, term:30, closing:9600, taxes:{amount:8000, per:'year'}, insurance:{amount:1860, per:'year'},
+  borrowers:[{ name:'Frank', job:'Operations manager at Sharp for 9 years', income:{type:'annual', amount:158000}, assets:142500, fico:[746,758,763],
+    debts:[{kind:'installment', label:'Car loan', payment:450, monthsLeft:30},{kind:'card', payment:150}] }] },
+];
+
+        // ===================== UNDERWRITING ENGINE =====================
+        // Rules follow the course workbook, with rental income at 75% and the
+        // current VA funding fee. Every rule is a switch in RULES so that the
+        // diagnostics can rerun a scenario with one rule broken and see whether
+        // that reproduces a student's wrong answer.
+        const STANDARD = {
+            conventional: { ltv: 0.80, back: 0.45, backComp: 0.50, compFico: 720, compMonths: 6, fico: 620, months: 2 },
+            va:           { ltv: 1.00, back: 0.41, backComp: null, fico: 620, months: 0 }
+        };
+        const RULES = {
+            value: 'lower',            // purchase value: lower of price and appraisal
+            rentFactor: 0.75,          // share of gross rent counted as income
+            shortCutoff: 10,           // installment, alimony, support with this many payments or fewer are excluded
+            leasesAlwaysCount: true,
+            studentPct: 0.01,          // 0% interest, 100 equal payments
+            cardPct: 0.05,             // minimum payment on a card balance
+            seMinYears: 2,             // self-employment history needed to use the income
+            commission: 'standard',    // declining: most recent year; otherwise two-year average
+            income: {},                // per-type conversion overrides (diagnostics only)
+            omit: {},                  // housing items or debts left out (diagnostics only)
+            secondHomeFront: 'primary',
+            secondHomeInBack: true,
+            reservesOn: 'housing',
+            vaFee: 0.0215,
+            refiLoan: 'new',
+            ltvAddsVaFee: false,
+            cashOutAsAsset: false
+        };
+        const EPS = 1e-6;
+
+        const amortPayment = (L, rate, years) => { const i = rate / 1200, n = years * 12; return L * i / (1 - Math.pow(1 + i, -n)); };
+        const presentValue = (P, rate, years) => { const i = rate / 1200, n = years * 12; return P * (1 - Math.pow(1 + i, -n)) / i; };
+        const middleScore = scores => [...scores].sort((a, b) => a - b)[1];
+        const perMonth = ({ amount, per }) => per === 'year' ? amount / 12 : per === 'half' ? amount * 2 / 12 : amount;
+
+        function incomeOf(b, R = RULES) {
+            const inc = b.income;
+            if (!inc) return 0;
+            if (b.selfEmployedYears !== undefined && b.selfEmployedYears < R.seMinYears) return 0;
+            const o = R.income[inc.type];
+            switch (inc.type) {
+                case 'semimonthly': return o === 'asBiweekly' ? inc.amount * 26 / 12 : inc.amount * 2;
+                case 'biweekly':    return o === 'asSemimonthly' ? inc.amount * 2 : inc.amount * 26 / 12;
+                case 'hourly':      return o === 'fourWeeks' ? inc.amount * inc.hours * 4 : inc.amount * inc.hours * 52 / 12;
+                case 'monthly':     return inc.amount;
+                case 'annual':      return inc.amount / 12;
+                case 'commission': {
+                    const [recent, prior] = inc.years.map(y => y.amount);
+                    if (R.commission === 'average') return (recent + prior) / 24;
+                    if (R.commission === 'higher') return Math.max(recent, prior) / 12;
+                    return (recent < prior ? recent : (recent + prior) / 2) / 12;
+                }
+            }
+            return 0;
+        }
+
+        /** Monthly amount a debt contributes, and why. */
+        function debtTreatment(d, R = RULES) {
+            switch (d.kind) {
+                case 'student':
+                    if (d.payment !== undefined) return { amount: d.payment, note: 'payment given' };
+                    return { amount: d.balance * R.studentPct, note: `1% of the $${fmt0(d.balance)} balance` };
+                case 'card':
+                    if (d.payment !== undefined) return { amount: d.payment, note: 'payment given' };
+                    return { amount: d.balance * R.cardPct, note: `5% of the $${fmt0(d.balance)} balance` };
+                case 'lease':
+                    if (!R.leasesAlwaysCount && d.monthsLeft !== undefined && d.monthsLeft <= R.shortCutoff) return { amount: 0, note: 'excluded' };
+                    return { amount: d.payment, note: d.monthsLeft !== undefined ? `counted: leases always count, even with ${d.monthsLeft} months left` : 'counted' };
+                case 'installment': case 'alimony': case 'support':
+                    if (d.monthsLeft !== undefined && d.monthsLeft <= R.shortCutoff) return { amount: 0, note: `excluded: only ${d.monthsLeft} payments left (10 or fewer)` };
+                    return { amount: d.payment, note: d.monthsLeft !== undefined ? `counted: ${d.monthsLeft} payments left` : 'counted' };
+                case 'rentalLoss':
+                    if (R.omit.rentalLoss) return { amount: 0, note: 'omitted' };
+                    return { amount: d.payment, note: 'negative cash flow counts as a debt' };
+            }
+            return { amount: d.payment || 0, note: '' };
+        }
+
+        function requestedLoan(s, R = RULES) {
+            if (s.purpose === 'refi') return R.refiLoan === 'payoff' ? s.payoff : s.payoff + (s.cashOut || 0);
+            return s.loan;
+        }
+
+        function underwrite(s, drop = [], loanOverride, R = RULES) {
+            const borrowers = s.borrowers.filter(b => !drop.includes(b.name));
+            const loan = loanOverride ?? requestedLoan(s, R);
+            let value;
+            if (s.purpose === 'refi') value = s.appraisal;
+            else if (R.value === 'price') value = s.price;
+            else if (R.value === 'appraisal') value = s.appraisal ?? s.price;
+            else value = Math.min(s.price, s.appraisal ?? s.price);
+            const ltvLoan = (s.va && R.ltvAddsVaFee) ? loan * (1 + R.vaFee) : loan;
+            const ltv = ltvLoan / value;
+
+            const middles = borrowers.map(b => middleScore(b.fico));
+            const fico = Math.min(...middles);
+
+            const incomes = borrowers.map(b => incomeOf(b, R));
+            const rental = s.rentPerUnit ? R.rentFactor * s.rentPerUnit * s.unitsRented : 0;
+            const income = incomes.reduce((a, b) => a + b, 0) + rental;
+
+            const pi = Math.round(amortPayment(loan, s.rate, s.term) * 100) / 100;
+            const taxes = R.omit.taxes ? 0 : (s.taxes ? perMonth(s.taxes) : s.price * 0.0125 / 12);
+            const ins = R.omit.insurance || !s.insurance ? 0 : perMonth(s.insurance);
+            const hoa = R.omit.hoa ? 0 : (s.hoa || 0);
+            const subjectPITI = pi + taxes + ins + hoa;
+            const housing = (s.primaryPITI && R.secondHomeFront === 'primary') ? s.primaryPITI : subjectPITI;
+
+            const debtRows = borrowers.map((b, bi) => (b.debts || []).map(d => {
+                const t = (R.omit.coBorrowerDebts && bi > 0) ? { amount: 0, note: 'omitted' } : debtTreatment(d, R);
+                return { borrower: b.name, debt: d, ...t };
+            })).flat();
+            const debts = debtRows.reduce((a, r) => a + r.amount, 0);
+            const secondHomeAdd = (s.primaryPITI && R.secondHomeInBack && R.secondHomeFront === 'primary') ? subjectPITI : 0;
+            const totalExp = housing + secondHomeAdd + debts;
+
+            const down = s.purpose === 'refi' ? 0 : (R.omit.down ? 0 : s.price - loan);
+            const paydown = s.purpose === 'refi' ? Math.max(0, s.payoff - loan) : 0;
+            const vaFee = s.va && !R.omit.vaFee ? R.vaFee * loan : 0;
+            const closing = R.omit.closing ? 0 : s.closing;
+            const cashToClose = down + paydown + closing + vaFee;
+            const assets = borrowers.reduce((a, b) => a + (b.assets || 0), 0) + (R.cashOutAsAsset && s.cashOut ? s.cashOut : 0);
+            const reserves = assets - cashToClose;
+            const basis = R.reservesOn === 'pi' ? pi : R.reservesOn === 'subject' ? subjectPITI : R.reservesOn === 'total' ? totalExp : housing;
+            const months = reserves / basis;
+
+            return { borrowers, loan, value, ltv, middles, fico, incomes, rental, income, pi, taxes, ins, hoa, subjectPITI, housing,
+                     debtRows, debts, secondHomeAdd, totalExp, front: housing / income, back: totalExp / income,
+                     down, paydown, vaFee, closing, cashToClose, assets, reserves, months };
+        }
+
+        function evaluate(s, drop = [], loanOverride) {
+            const r = underwrite(s, drop, loanOverride);
+            const L = s.va ? STANDARD.va : STANDARD.conventional;
+            const comp = !!L.backComp && r.fico >= L.compFico && r.months >= L.compMonths;
+            const backLimit = comp ? L.backComp : L.back;
+            const fails = [];
+            if (r.ltv > L.ltv + EPS) fails.push('ltv');
+            if (r.fico < L.fico) fails.push('fico');
+            if (r.back > backLimit + EPS) fails.push('dti');
+            if (r.months < L.months - EPS) fails.push('reserves');
+            return { r, L, comp, backLimit, fails, pass: fails.length === 0 };
+        }
+
+        /** Borrowers who bring no usable income: removing them can only remove debts or a low score. */
+        function droppable(s) {
+            return s.borrowers.length > 1 ? s.borrowers.filter(b => incomeOf(b) === 0).map(b => b.name) : [];
+        }
+
+        /** Largest loan, no larger than requested, that passes every limit. */
+        function maxLoan(s, drop = []) {
+            const L = s.va ? STANDARD.va : STANDARD.conventional;
+            const base = underwrite(s, drop);
+            const req = requestedLoan(s);
+            const ltvCap = L.ltv * base.value;
+            const fixed = base.debts + (s.primaryPITI || 0) + base.taxes + base.ins + base.hoa;
+            const limits = [L.back];
+            if (L.backComp && base.fico >= L.compFico) limits.push(L.backComp);
+            let best = null;
+            for (const lim of limits) {
+                const maxPI = lim * base.income - fixed;
+                const dtiCap = maxPI > 0 ? presentValue(maxPI, s.rate, s.term) : 0;
+                const U = Math.floor(Math.min(req, ltvCap, dtiCap));
+                if (U <= 0) continue;
+                const e = evaluate(s, drop, U);
+                if (e.pass && (!best || U > best.loan)) {
+                    best = { loan: U, limit: lim, maxPI, dtiCap, ltvCap, req, binding: U === Math.floor(ltvCap) ? 'ltv' : U === Math.floor(req) ? 'req' : 'dti', eval: e };
+                }
+            }
+            return best;
+        }
+
+        function decide(s) {
+            const asApplied = evaluate(s);
+            if (asApplied.pass) return { decision: 'approve', asApplied };
+            for (const name of droppable(s)) {
+                const after = evaluate(s, [name]);
+                if (after.pass) return { decision: 'drop', drop: name, asApplied, after };
+            }
+            let bonus = null;
+            for (const d of [[], ...droppable(s).map(n => [n])]) {
+                const m = maxLoan(s, d);
+                if (m && (!bonus || m.loan > bonus.loan)) bonus = { ...m, drop: d[0] || null };
+            }
+            return { decision: 'deny', asApplied, bonus };
+        }
+
+        // ===================== FORMATTING =====================
+        function fmt(n) { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+        function fmt0(n) { return Math.round(n).toLocaleString('en-US'); }
+        function pctS(x, dp = 2) { return `${(x * 100).toFixed(dp)}%`; }
+        function namesOf(s) {
+            const n = s.borrowers.map(b => b.name);
+            return n.length === 1 ? n[0] : `${n.slice(0, -1).join(', ')} and ${n[n.length - 1]}`;
+        }
+
+        // ===================== SCENARIO TEXT (generated from the data) =====================
+        function incomeLine(inc) {
+            switch (inc.type) {
+                case 'semimonthly': return `Semi-monthly income of $${fmt0(inc.amount)}`;
+                case 'biweekly':    return `Bi-weekly income of $${fmt0(inc.amount)}`;
+                case 'hourly':      return `$${fmt0(inc.amount)} per hour (${inc.hours} hours per week)`;
+                case 'monthly':     return `Monthly income of $${fmt0(inc.amount)}`;
+                case 'annual':      return `Annual income of $${fmt0(inc.amount)}`;
+                case 'commission':  return `Commission income of ${inc.years.map(y => `$${fmt0(y.amount)} in ${y.year}`).join(' and ')}`;
+            }
+            return '';
+        }
+        function debtLine(d) {
+            const left = d.monthsLeft !== undefined ? ` (${d.monthsLeft} months left)` : '';
+            switch (d.kind) {
+                case 'student':     return d.payment !== undefined ? `Student loan payment of $${fmt0(d.payment)} per month` : `Student loan balance of $${fmt0(d.balance)}`;
+                case 'card':        return d.payment !== undefined ? `Credit card payments of $${fmt0(d.payment)} per month` : `Credit card balances of $${fmt0(d.balance)}`;
+                case 'lease':       return `${d.label || 'Car lease'} payment of $${fmt0(d.payment)} per month${left}`;
+                case 'installment': return `${d.label || 'Installment loan'} payment of $${fmt0(d.payment)} per month${left}`;
+                case 'alimony':     return `Alimony payments of $${fmt0(d.payment)} per month${left}`;
+                case 'support':     return `${d.label || 'Child support'} of $${fmt0(d.payment)} per month${left}`;
+                case 'rentalLoss':  return `Rental property negative cash flow of $${fmt0(d.payment)} per month`;
+            }
+            return '';
+        }
+        function taxSentence(t) {
+            if (!t) return '';
+            if (t.per === 'half') return `Property taxes are $${fmt0(t.amount)}, paid twice a year${t.note ? ` (${t.note})` : ''}.`;
+            if (t.per === 'month') return `Property taxes are $${fmt0(t.amount)} per month.`;
+            return `Property taxes are $${fmt0(t.amount)} per year.`;
+        }
+        function insuranceSentence(i) {
+            if (!i) return '';
+            const label = i.label || "Homeowner's insurance";
+            return i.per === 'half' ? `${label} costs $${fmt(i.amount)} every six months.` : `${label} costs $${fmt0(i.amount)} per year.`;
+        }
+        function propertyText(s) {
+            const who = namesOf(s), has = s.borrowers.length > 1 ? 'have' : 'has';
+            const out = [s.opener];
+            if (s.purpose === 'refi') {
+                out.push(`The current loan balance is $${fmt0(s.payoff)}${s.cashOut ? `, and ${who} would like to take out an additional $${fmt0(s.cashOut)}${s.cashOutUse ? ` for ${s.cashOutUse}` : ''}` : ''}. The property has appraised at $${fmt0(s.appraisal)}.`);
+            } else {
+                let t = `The purchase price is $${fmt0(s.price)}`;
+                t += s.downPct ? `, with a ${s.downPct}% down payment` : `, and the loan amount will be $${fmt0(s.loan)}`;
+                if (s.appraisal) t += `. The property has appraised for $${fmt0(s.appraisal)}`;
+                out.push(t + '.');
+            }
+            out.push(`${who} ${has} locked in a ${s.term}-year fixed rate loan at ${s.rate}% with $${fmt0(s.closing)} in closing costs${s.va ? ' (excluding the VA funding fee)' : ''}.`);
+            if (s.va) out.push('The VA funding fee is 2.15% of the loan amount, paid in cash at closing.');
+            out.push(taxSentence(s.taxes), insuranceSentence(s.insurance));
+            if (s.hoa) out.push(`HOA dues are $${fmt0(s.hoa)} per month.`);
+            if (s.rentPerUnit) out.push(`Each unit rents for $${fmt0(s.rentPerUnit)} per month.`);
+            if (s.primaryPITI) out.push(`PITI on the primary residence is $${fmt0(s.primaryPITI)} per month.`);
+            return out.filter(Boolean).join(' ');
+        }
+        function borrowerBlock(b) {
+            const lines = [];
+            if (b.job) lines.push(b.job);
+            if (b.income) lines.push(incomeLine(b.income));
+            (b.debts || []).forEach(d => lines.push(debtLine(d)));
+            lines.push(`Credit scores ${b.fico.join(' ')}`);
+            if (b.assets) lines.push(`${b.assetLabel || 'Savings'} $${fmt0(b.assets)}`);
+            return `<div class="borrower-card">
+                <p class="font-bold text-gray-900 mb-1">${b.name}</p>
+                <ul class="text-sm text-gray-700 space-y-0.5">${lines.map(l => `<li>${l}</li>`).join('')}</ul>
+            </div>`;
+        }
+
+        // ===================== STEPS =====================
+        const STEP_DEFS = [
+            { id: 'ltv',      c: 'Collateral', title: 'Loan-to-value ratio (%)',                  kind: 'pct',    ph: 'Enter as a percentage, e.g. 72.50', ws: 'ws-collateral' },
+            { id: 'fico',     c: 'Character',  title: 'Representative credit score',              kind: 'int',    ph: 'e.g. 745',                          ws: 'ws-character' },
+            { id: 'front',    c: 'Capacity',   title: 'Housing expense ratio, front-end DTI (%)', kind: 'pct',    ph: 'Enter as a percentage, e.g. 31.25', ws: 'ws-capacity' },
+            { id: 'back',     c: 'Capacity',   title: 'Total debt ratio, back-end DTI (%)',       kind: 'pct',    ph: 'Enter as a percentage, e.g. 42.10', ws: 'ws-debts' },
+            { id: 'reserves', c: 'Capital',    title: 'Reserves, in months of PITI',              kind: 'months', ph: 'e.g. 8.40',                         ws: 'ws-capital' },
+            { id: 'decision', c: 'Decision',   title: 'Approve or deny?',                         kind: 'decision',                                        ws: 'ws-decision' },
+            { id: 'bonus',    c: 'Bonus',      title: 'Largest loan you could approve ($)',       kind: 'bonus',  ph: 'e.g. 455000',                       ws: 'ws-bonus' },
+        ];
+        const TOL = { pct: 0.05, months: 0.05, int: 0, bonus: 500 };
+        const CHECK_NAMES = { ltv: 'LTV', fico: 'Credit score', dti: 'Back-end DTI', reserves: 'Reserves' };
+
+        let cur = null;   // { s, d, idx, attempts, results, lastHint }
+
+        function correctValue(id) {
+            const r = cur.d.asApplied.r;
+            return { ltv: r.ltv * 100, fico: r.fico, front: r.front * 100, back: r.back * 100, reserves: r.months }[id];
+        }
+        function showValue(id, v) {
+            return id === 'fico' ? String(v) : id === 'reserves' ? `${v.toFixed(2)} months` : `${v.toFixed(2)}%`;
+        }
+        function activeSteps() {
+            return STEP_DEFS.filter(st => st.id !== 'bonus' || cur.d.decision === 'deny');
+        }
+
+        // ===================== DIAGNOSTICS =====================
+        // Each candidate reruns the scenario with one rule broken. A slip is named
+        // only when it alone reproduces the student's answer; when several do,
+        // all are offered rather than guessing.
+        function rulesWith(over) {
+            return { ...RULES, ...over, income: { ...RULES.income, ...(over.income || {}) }, omit: { ...RULES.omit, ...(over.omit || {}) } };
+        }
+        function variant(over, drop = []) { return underwrite(cur.s, drop, undefined, rulesWith(over)); }
+
+        function hasIncome(type) { return cur.s.borrowers.some(b => b.income && b.income.type === type); }
+        function hasDebt(test) { return cur.s.borrowers.some(b => (b.debts || []).some(test)); }
+
+        function capacityCandidates() {
+            const s = cur.s, out = [];
+            const r = cur.d.asApplied.r;
+            if (r.taxes) out.push({ over: { omit: { taxes: true } }, msg: 'You left out the <strong>property taxes</strong>. Housing expense is principal, interest, taxes and insurance (PITI), plus any HOA dues.' });
+            if (r.ins) out.push({ over: { omit: { insurance: true } }, msg: "You left out the <strong>insurance</strong>. Housing expense is the full PITI." });
+            if (r.hoa) out.push({ over: { omit: { hoa: true } }, msg: 'You left out the <strong>HOA dues</strong>. They are part of the monthly housing expense.' });
+            out.push({ over: { omit: { taxes: true, insurance: true, hoa: true } }, msg: 'You used <strong>principal and interest only</strong>. Housing expense is the full PITI, plus HOA dues.' });
+            if (hasIncome('biweekly')) out.push({ over: { income: { biweekly: 'asSemimonthly' } }, msg: 'You treated <strong>bi-weekly</strong> pay as twice a month. Bi-weekly is 26 paychecks a year: multiply by 26, then divide by 12.' });
+            if (hasIncome('semimonthly')) out.push({ over: { income: { semimonthly: 'asBiweekly' } }, msg: 'You treated <strong>semi-monthly</strong> pay as every two weeks. Semi-monthly is exactly twice a month: multiply by 2.' });
+            if (hasIncome('hourly')) out.push({ over: { income: { hourly: 'fourWeeks' } }, msg: 'You counted <strong>four weeks</strong> a month. A year has 52 weeks: hourly rate &times; hours &times; 52, divided by 12.' });
+            if (hasIncome('commission')) {
+                out.push({ over: { commission: 'average' }, msg: 'You <strong>averaged</strong> the two years of commission. When commission income is falling, use the lower, most recent year.' });
+                out.push({ over: { commission: 'higher' }, msg: 'You used the <strong>higher</strong> year of commission. When it is falling, use the lower, most recent year.' });
+            }
+            if (s.borrowers.some(b => b.selfEmployedYears !== undefined && b.selfEmployedYears < 2)) {
+                out.push({ over: { seMinYears: 0 }, msg: 'You counted <strong>self-employment income with less than two years of history</strong>. Lenders need a two-year track record before they will rely on it.' });
+            }
+            if (s.rentPerUnit) {
+                out.push({ over: { rentFactor: 1 }, msg: 'You counted <strong>100% of the rent</strong>. Count 75% of it: the other 25% allows for vacancy and upkeep.' });
+                out.push({ over: { rentFactor: 0 }, msg: 'You left out the <strong>rental income</strong> from the unit that will be rented. Count 75% of its rent.' });
+            }
+            if (s.primaryPITI) out.push({ over: { secondHomeFront: 'subject', secondHomeInBack: false }, msg: "You used the <strong>second home's</strong> PITI as the housing expense. The housing ratio uses the primary residence's PITI; the second home's payment goes into the back-end total." });
+            return out;
+        }
+
+        function backCandidates() {
+            const s = cur.s, out = capacityCandidates();
+            if (hasDebt(d => ['installment', 'alimony', 'support'].includes(d.kind) && d.monthsLeft !== undefined && d.monthsLeft <= 10)) {
+                out.push({ over: { shortCutoff: -1 }, msg: 'You counted a debt with <strong>10 or fewer payments left</strong>. Car loans and other installment debts, alimony and child support that will end within 10 months are left out.' });
+            }
+            if (hasDebt(d => d.kind === 'lease' && d.monthsLeft !== undefined && d.monthsLeft <= 10)) {
+                out.push({ over: { leasesAlwaysCount: false }, msg: 'You left out a <strong>lease</strong> with only a few months to go. Leases always count: when one ends, the borrower almost always leases another car.' });
+            }
+            if (hasDebt(d => d.kind === 'student' && d.payment === undefined)) out.push({ over: { studentPct: 0 }, msg: 'You left out the <strong>student loans</strong>. With 100 equal payments at 0%, the monthly payment is 1% of the balance.' });
+            if (hasDebt(d => d.kind === 'card' && d.payment === undefined)) out.push({ over: { cardPct: 0 }, msg: 'You left out the <strong>credit card balance</strong>. Count a minimum payment of 5% of the balance.' });
+            if (hasDebt(d => d.kind === 'rentalLoss')) out.push({ over: { omit: { rentalLoss: true } }, msg: "You left out the rental property's <strong>negative cash flow</strong>. A monthly loss on a rental counts as a debt." });
+            if (s.primaryPITI) out.push({ over: { secondHomeInBack: false }, msg: "You left the <strong>second home's PITI</strong> out of the total. Total expense is the primary residence's PITI, plus the second home's PITI, plus every other debt." });
+            if (s.borrowers.length > 1 && s.borrowers.slice(1).some(b => (b.debts || []).length)) {
+                out.push({ over: { omit: { coBorrowerDebts: true } }, msg: `You left out <strong>${s.borrowers.slice(1).map(b => b.name).join(' and ')}'s</strong> debts. Every borrower on the loan brings their debts with them.` });
+            }
+            droppable(s).forEach(name => out.push({ drop: [name], over: {}, msg: `That is the ratio <strong>without ${name}</strong>. Steps 1 to 5 evaluate the application as submitted; removing a borrower is a decision you make in step 6.` }));
+            return out;
+        }
+
+        function collateralCandidates() {
+            const s = cur.s, out = [];
+            if (s.purpose !== 'refi' && s.appraisal && s.appraisal > s.price) out.push({ over: { value: 'appraisal' }, msg: 'You used the <strong>appraisal</strong>. For a purchase, value is the lower of the price and the appraisal, which here is the price.' });
+            if (s.purpose !== 'refi' && s.appraisal && s.appraisal < s.price) out.push({ over: { value: 'price' }, msg: 'You used the <strong>purchase price</strong>, but the appraisal came in lower. Value is the lower of the two.' });
+            if (s.purpose === 'refi' && s.cashOut) out.push({ over: { refiLoan: 'payoff' }, msg: `You used the <strong>current balance</strong>. The new loan also includes the $${fmt0(s.cashOut)} of cash out.` });
+            if (s.va) out.push({ over: { ltvAddsVaFee: true }, msg: 'You added the <strong>funding fee</strong> to the loan. Here it is paid in cash at closing, so it is not part of the loan.' });
+            return out;
+        }
+
+        function reserveCandidates() {
+            const s = cur.s, out = [];
+            out.push({ over: { omit: { closing: true } }, msg: 'You left out the <strong>closing costs</strong>. Cash to close is the down payment plus the closing costs.' });
+            if (s.purpose !== 'refi') out.push({ over: { omit: { down: true } }, msg: 'You left out the <strong>down payment</strong>. It comes out of the verified assets before anything counts as reserves.' });
+            if (s.va) out.push({ over: { omit: { vaFee: true } }, msg: 'You left out the <strong>VA funding fee</strong>. It is paid in cash at closing, so it comes out of the assets too.' });
+            out.push({ over: { reservesOn: 'pi' }, msg: 'You divided by <strong>principal and interest only</strong>. Reserves are measured in months of the full PITI.' });
+            out.push({ over: { reservesOn: 'total' }, msg: 'You divided by <strong>total monthly debts</strong>. Reserves are measured in months of the housing payment, PITI.' });
+            if (s.primaryPITI) out.push({ over: { reservesOn: 'subject' }, msg: "You divided by the <strong>second home's</strong> PITI. In this course, reserves on a second home are counted in months of the primary residence's PITI." });
+            if (s.purpose === 'refi' && s.cashOut) out.push({ over: { cashOutAsAsset: true }, msg: `You counted the <strong>cash out</strong> as an asset. It is earmarked for ${s.cashOutUse || 'another purpose'}, so it does not count toward reserves.` });
+            return out;
+        }
+
+        function ficoCandidates() {
+            const s = cur.s, out = [];
+            const all = s.borrowers.flatMap(b => b.fico);
+            const middles = s.borrowers.map(b => middleScore(b.fico));
+            if (s.borrowers.length > 1) out.push({ value: Math.max(...middles), msg: 'You used the <strong>higher</strong> middle score. With more than one borrower, the lender uses the lowest of their middle scores.' });
+            s.borrowers.forEach(b => out.push({ value: b.fico.reduce((a, c) => a + c, 0) / 3, msg: `You <strong>averaged</strong> ${b.name}'s three scores. Use the middle one, not the average.` }));
+            out.push({ value: Math.min(...all), msg: 'That is the <strong>lowest single score</strong>. Take the middle of each borrower\'s three scores instead.' });
+            out.push({ value: Math.max(...all), msg: 'That is the <strong>highest single score</strong>. Take the middle of each borrower\'s three scores, then the lowest of those.' });
+            if (s.borrowers.length > 1) out.push({ value: middles.reduce((a, c) => a + c, 0) / middles.length, msg: 'You <strong>averaged</strong> the middle scores. With more than one borrower, use the lowest middle score.' });
+            droppable(s).forEach(name => out.push({ value: Math.min(...s.borrowers.filter(b => b.name !== name).map(b => middleScore(b.fico))), msg: `That is the score <strong>without ${name}</strong>. Evaluate the application as submitted first; removing a borrower is a step 6 decision.` }));
+            return out;
+        }
+
+        /** Returns HTML for the matching slips, or '' when none matches. */
+        function diagnose(id, val) {
+            const correct = correctValue(id);
+            const grading = id === 'fico' ? 0 : TOL[STEP_DEFS.find(x => x.id === id).kind];
+            if (Math.abs(val - correct) <= grading) return '';
+            let cands = [];
+            if (id === 'fico') {
+                cands = ficoCandidates().filter(c => Math.abs(c.value - correct) > 0.5 && Math.abs(c.value - val) <= 0.5);
+            } else {
+                const pick = { ltv: collateralCandidates, front: capacityCandidates, back: backCandidates, reserves: reserveCandidates }[id]();
+                const key = { ltv: r => r.ltv * 100, front: r => r.front * 100, back: r => r.back * 100, reserves: r => r.months }[id];
+                const tol = id === 'reserves' ? 0.04 : 0.04;
+                cands = pick.map(c => ({ ...c, value: key(variant(c.over, c.drop || [])) }))
+                            .filter(c => Math.abs(c.value - correct) > grading && Math.abs(c.value - val) <= tol);
+            }
+            if (id === 'ltv') {
+                const r = cur.d.asApplied.r;
+                if (Math.abs(val - (100 - r.ltv * 100)) <= 0.04) cands.push({ msg: 'That is the <strong>equity</strong> share. LTV is the loan divided by the value.' });
+            }
+            const msgs = [...new Set(cands.map(c => c.msg))];
+            if (!msgs.length) return '';
+            if (msgs.length === 1) return `<p>&#9888;&#65039; ${msgs[0]}</p>`;
+            return `<p class="font-semibold">&#9888;&#65039; Your answer matches more than one common slip, so it is not possible to tell which from the number alone. It is one of these:</p>
+                <ul class="list-disc list-inside ml-2 space-y-1 mt-1">${msgs.map(m => `<li>${m}</li>`).join('')}</ul>`;
+        }
+
+        // ===================== RENDERING A SCENARIO =====================
+        const $ = id => document.getElementById(id);
+
+        function loadScenario(id) {
+            const s = SCENARIOS.find(x => x.id === id) || SCENARIOS[0];
+            cur = { s, d: decide(s), idx: 0, attempts: 0, results: {}, lastHint: {} };
+            $('scenario-select').value = s.id;
+            $('scenario-title').textContent = s.title;
+            $('scenario-tag').textContent = s.source === 'workshop' ? 'Workshop case' : 'Practice scenario';
+            $('scenario-text').textContent = propertyText(s);
+            $('borrowers').innerHTML = s.borrowers.map(borrowerBlock).join('');
+            $('borrowers').className = `grid gap-3 mt-4 ${s.borrowers.length > 1 ? 'sm:grid-cols-2' : ''}`;
+            renderSteps();
+            $('completion').hidden = true;
+            unlock(0);
+        }
+
+        function stepCard(st, n) {
+            const head = `<div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="c-label">${st.c}</p>
+                        <h3 class="text-lg font-semibold text-gray-800">Step ${n}: ${st.title}</h3>
+                    </div>
+                    <button type="button" data-ws="${st.ws}" class="walk-link shrink-0 text-sm font-semibold text-indigo-600 hover:underline">Show me how</button>
+                </div>`;
+            let body;
+            if (st.kind === 'decision') {
+                // Every co-borrower is offered, so the options do not reveal which one to remove.
+                const drops = cur.s.borrowers.length > 1 ? cur.s.borrowers.map(b => b.name) : [];
+                body = `<fieldset class="mt-3">
+                        <legend class="text-sm font-semibold text-gray-700 mb-2">Your decision</legend>
+                        <label class="choice"><input type="radio" name="decision" value="approve"> Approve the loan as submitted</label>
+                        ${drops.map(n => `<label class="choice"><input type="radio" name="decision" value="drop:${n}"> Approve, after removing ${n} from the loan</label>`).join('')}
+                        <label class="choice"><input type="radio" name="decision" value="deny"> Deny the loan</label>
+                    </fieldset>
+                    <fieldset class="mt-3">
+                        <legend class="text-sm font-semibold text-gray-700 mb-1">Unless you approve as submitted: which limits does the application fail <em>as submitted</em>?</legend>
+                        <div class="flex flex-wrap gap-x-5 gap-y-1">
+                            ${Object.entries(CHECK_NAMES).map(([k, v]) => `<label class="text-sm"><input type="checkbox" name="fails" value="${k}"> ${v}</label>`).join('')}
+                        </div>
+                    </fieldset>
+                    <p class="text-xs text-gray-500 mt-2">The limits are in the <button type="button" class="guide-link underline text-indigo-600">Concept Guide</button>.</p>
+                    <button id="check-${st.id}" class="mt-3 bg-indigo-600 text-white font-bold py-2 px-6 rounded-md hover:bg-indigo-700">Check decision</button>`;
+            } else if (st.kind === 'bonus') {
+                body = `<p class="text-sm text-gray-600 mt-1">The loan is denied. What is the largest loan, no larger than the $${fmt0(requestedLoan(cur.s))} requested, that would pass every limit? You may remove a borrower who brings no usable income.</p>
+                    <div class="flex flex-col sm:flex-row items-center gap-3 mt-3">
+                        <input type="number" id="answer-${st.id}" class="flex-grow w-full px-4 py-2 text-lg border-gray-300 rounded-md shadow-sm" placeholder="${st.ph}">
+                        <button id="check-${st.id}" class="w-full sm:w-auto bg-indigo-600 text-white font-bold py-2 px-6 rounded-md hover:bg-indigo-700">Check bonus</button>
+                    </div>
+                    <label class="block text-sm mt-2"><input type="checkbox" id="none-${st.id}"> No loan amount up to the one requested can be approved</label>`;
+            } else {
+                body = `<div class="flex flex-col sm:flex-row items-center gap-3 mt-3">
+                        <input type="number" step="any" id="answer-${st.id}" class="flex-grow w-full px-4 py-2 text-lg border-gray-300 rounded-md shadow-sm" placeholder="${st.ph}">
+                        <button id="check-${st.id}" class="w-full sm:w-auto bg-indigo-600 text-white font-bold py-2 px-6 rounded-md hover:bg-indigo-700">Check</button>
+                    </div>`;
+            }
+            return `<div id="step-${st.id}" class="step-container disabled p-5 bg-white border rounded-lg shadow-sm">
+                ${head}${body}
+                <div id="feedback-${st.id}" class="mt-3 p-3 rounded-md text-center" hidden></div>
+                <div id="hint-${st.id}" class="text-sm mt-2"></div>
+            </div>`;
+        }
+
+        function renderSteps() {
+            $('steps').innerHTML = activeSteps().map((st, i) => stepCard(st, i + 1)).join('');
+            activeSteps().forEach(st => {
+                $(`check-${st.id}`).addEventListener('click', () => checkStep(st));
+                const input = $(`answer-${st.id}`);
+                if (input) input.addEventListener('keydown', e => { if (e.key === 'Enter') checkStep(st); });
+            });
+            document.querySelectorAll('#steps .walk-link').forEach(b => b.addEventListener('click', () => openWorksheet(b.dataset.ws)));
+            document.querySelectorAll('#steps .guide-link').forEach(b => b.addEventListener('click', () => openGuide('guide-standards')));
+        }
+
+        function unlock(i) {
+            cur.idx = i; cur.attempts = 0;
+            const st = activeSteps()[i];
+            if (!st) return;
+            $(`step-${st.id}`).classList.remove('disabled');
+        }
+
+        function feedback(id, html, type) {
+            const el = $(`feedback-${id}`);
+            el.hidden = false;
+            el.className = `mt-3 p-3 rounded-md text-center ${type === 'success' ? 'bg-green-100 text-green-800' : type === 'info' ? 'bg-sky-100 text-sky-900' : 'bg-red-100 text-red-800'}`;
+            el.innerHTML = html;
+        }
+        function amberBox(html) {
+            return html ? `<div class="mt-3 text-left max-w-xl mx-auto p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900">${html}</div>` : '';
+        }
+
+        function finishStep(st, correct, shown) {
+            cur.results[st.id] = { correct, shown };
+            const card = $(`step-${st.id}`);
+            card.classList.add('done');
+            // Lock the answer controls, but keep every help button working.
+            card.querySelectorAll('input, button:not(.walk-link):not(.guide-link):not(.ws-open)').forEach(el => { el.disabled = true; });
+            const next = cur.idx + 1;
+            if (next < activeSteps().length) unlock(next); else showCompletion();
+        }
+
+        function walkButton(st) {
+            return `<div class="text-center mt-3"><button type="button" class="ws-open bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md" data-ws="${st.ws}">&#129517; Walk me through this step</button></div>`;
+        }
+        function wireWalkButtons(id) {
+            $(`hint-${id}`).querySelectorAll('.ws-open').forEach(b => b.addEventListener('click', () => openWorksheet(b.dataset.ws)));
+        }
+
+        // ===================== CHECKING ANSWERS =====================
+        function readNumber(st) {
+            let v = parseFloat($(`answer-${st.id}`).value);
+            if (isNaN(v)) return null;
+            if (st.kind === 'pct' && v > 0 && v < 1.5) v *= 100;   // accept 0.4888 for 48.88%
+            return v;
+        }
+
+        function checkStep(st) {
+            if (st.kind === 'decision') return checkDecision(st);
+            if (st.kind === 'bonus') return checkBonus(st);
+            const v = readNumber(st);
+            if (v === null) { feedback(st.id, 'Please enter a number.', 'error'); return; }
+            cur.attempts++;
+            const correct = correctValue(st.id);
+            const ok = Math.abs(v - correct) <= TOL[st.kind];
+            const hint = $(`hint-${st.id}`);
+            if (ok) {
+                feedback(st.id, `Correct! ${showValue(st.id, correct)}`, 'success');
+                hint.innerHTML = '';
+                finishStep(st, true, v);
+            } else if (cur.attempts === 1) {
+                feedback(st.id, 'Not quite. Try again.', 'error');
+                hint.innerHTML = `<p class="text-center text-gray-700">${stepHint(st.id, 0)}</p>` + amberBox(diagnose(st.id, v));
+            } else {
+                feedback(st.id, `The answer is ${showValue(st.id, correct)}. Moving on.`, 'error');
+                hint.innerHTML = amberBox(diagnose(st.id, v)) + walkButton(st);
+                wireWalkButtons(st.id);
+                showGif(INCORRECT_GIF);
+                finishStep(st, false, v);
+            }
+        }
+
+        function decisionKey() { return cur.d.decision === 'drop' ? `drop:${cur.d.drop}` : cur.d.decision; }
+        function failsText(e) {
+            const r = e.r, L = e.L;
+            const rows = [];
+            rows.push(`LTV ${pctS(r.ltv)} ${e.fails.includes('ltv') ? '&gt;' : '&le;'} ${pctS(L.ltv, 0)}`);
+            rows.push(`score ${r.fico} ${e.fails.includes('fico') ? '&lt;' : '&ge;'} ${L.fico}`);
+            rows.push(`back-end DTI ${pctS(r.back)} ${e.fails.includes('dti') ? '&gt;' : '&le;'} ${pctS(e.backLimit, 0)}${e.comp ? ' (compensating factors)' : ''}`);
+            if (L.months) rows.push(`reserves ${r.months.toFixed(2)} months ${e.fails.includes('reserves') ? '&lt;' : '&ge;'} ${L.months}`);
+            return rows.join('; ');
+        }
+        function decisionExplanation() {
+            const d = cur.d, a = d.asApplied;
+            let t = `<p><strong>As submitted:</strong> ${failsText(a)}.</p>`;
+            if (!cur.s.va && a.r.back > 0.45 + EPS) {
+                t += a.comp
+                    ? `<p class="mt-1">The back-end ratio is over 45%, but the score is ${a.r.fico} (720 or higher) and reserves are ${a.r.months.toFixed(1)} months (6 or more), so the 50% limit applies.</p>`
+                    : `<p class="mt-1">The back-end ratio is over 45%, and the 50% exception needs both a score of 720 or higher and at least 6 months of reserves. Here the score is ${a.r.fico} and reserves are ${a.r.months.toFixed(1)} months.</p>`;
+            }
+            if (d.decision === 'drop') t += `<p class="mt-1"><strong>Without ${d.drop}:</strong> ${failsText(d.after)}. Every limit passes, so the loan can be approved with ${d.drop} removed.</p>`;
+            if (d.decision === 'deny') {
+                droppable(cur.s).forEach(n => { const e = evaluate(cur.s, [n]); t += `<p class="mt-1"><strong>Without ${n}:</strong> ${failsText(e)}. Still not approvable.</p>`; });
+            }
+            return t;
+        }
+
+        function checkDecision(st) {
+            const choice = (document.querySelector('input[name="decision"]:checked') || {}).value;
+            if (!choice) { feedback(st.id, 'Choose a decision first.', 'error'); return; }
+            const ticked = [...document.querySelectorAll('input[name="fails"]:checked')].map(x => x.value).sort();
+            const want = decisionKey();
+            const wantFails = [...cur.d.asApplied.fails].sort();
+            const choiceOk = choice === want;
+            const failsOk = want === 'approve' || JSON.stringify(ticked) === JSON.stringify(wantFails);
+            cur.attempts++;
+            const hint = $(`hint-${st.id}`);
+            if (choiceOk && failsOk) {
+                feedback(st.id, 'Correct!', 'success');
+                hint.innerHTML = `<div class="text-left max-w-xl mx-auto text-gray-700">${decisionExplanation()}</div>`;
+                showGif(CORRECT_GIFS[Math.floor(Math.random() * CORRECT_GIFS.length)]);
+                finishStep(st, true, choice);
+                return;
+            }
+            if (cur.attempts === 1) {
+                let msg;
+                if (!choiceOk) {
+                    if (want === 'approve') msg = cur.d.asApplied.comp && cur.d.asApplied.r.back > 0.45 + EPS
+                        ? 'Every limit passes. If the back-end ratio is over 45%, check whether the compensating-factor exception applies: a score of 720 or higher and at least 6 months of reserves.'
+                        : 'Every limit passes as submitted. Compare each ratio with its limit again.';
+                    else if (choice === 'approve') msg = 'As submitted, the application fails at least one limit.';
+                    else if (choice.startsWith('drop:')) {
+                        const n = choice.slice(5);
+                        msg = incomeOf(cur.s.borrowers.find(b => b.name === n)) > 0
+                            ? `Removing ${n} also removes ${n}'s income, which this loan depends on.`
+                            : `Removing ${n} does not fix it. Recalculate the ratios without ${n} and compare them with the limits.`;
+                    }
+                    else if (want.startsWith('drop:')) msg = 'Before denying, check whether removing a borrower who brings no usable income would fix the application.';
+                    else msg = 'Not quite. Compare each ratio with its limit again.';
+                } else {
+                    msg = 'Your decision is right, but the list of failed limits is not. Check each ratio against its limit, as submitted.';
+                }
+                feedback(st.id, 'Not quite. Try again.', 'error');
+                hint.innerHTML = amberBox(`<p>${msg}</p>`);
+            } else {
+                const label = want === 'approve' ? 'Approve as submitted' : want === 'deny' ? 'Deny' : `Approve after removing ${cur.d.drop}`;
+                feedback(st.id, `The answer is: ${label}${want !== 'approve' ? `, failing ${wantFails.map(f => CHECK_NAMES[f]).join(' and ')} as submitted` : ''}.`, 'error');
+                hint.innerHTML = `<div class="text-left max-w-xl mx-auto text-gray-700">${decisionExplanation()}</div>` + walkButton(st);
+                wireWalkButtons(st.id);
+                showGif(INCORRECT_GIF);
+                finishStep(st, false, choice);
+            }
+        }
+
+        function bonusDiagnosis(val) {
+            const s = cur.s, b = cur.d.bonus, out = [];
+            const structures = [[], ...droppable(s).map(n => [n])];
+            const L = s.va ? STANDARD.va : STANDARD.conventional;
+            structures.forEach(drop => {
+                const base = underwrite(s, drop);
+                const fixed = base.debts + (s.primaryPITI || 0) + base.taxes + base.ins + base.hoa;
+                [L.back, L.backComp].filter(Boolean).forEach(lim => {
+                    const cap = presentValue(lim * base.income - fixed, s.rate, s.term);
+                    if (Math.abs(cap - val) <= 500 && (!b || Math.abs(cap - b.loan) > 500)) {
+                        if (lim !== (b ? b.limit : L.back)) out.push(`You worked from a <strong>${lim * 100}%</strong> back-end limit. ${lim === 0.50 ? 'The 50% exception needs a score of 720 or higher and at least 6 months of reserves at the new loan.' : 'This borrower qualifies for the 50% compensating-factor limit.'}`);
+                        else if (b && b.binding === 'ltv') out.push(`That loan meets the DTI limit, but it breaks the <strong>LTV</strong> limit. Also cap the loan at ${pctS(L.ltv, 0)} of the value.`);
+                        else if (!b) out.push('That loan meets the DTI limit, but check <strong>reserves</strong> at that loan. A smaller loan needs a bigger down payment, which leaves less cash in reserve.');
+                        if (drop.length && b && !b.drop) out.push(`That is the loan <strong>without ${drop[0]}</strong>.`);
+                        if (!drop.length && b && b.drop) out.push(`You kept ${b.drop} on the loan. Removing ${b.drop}, who brings no usable income, allows a larger loan.`);
+                    }
+                });
+                if (Math.abs(L.ltv * base.value - val) <= 500 && (!b || Math.abs(L.ltv * base.value - b.loan) > 500)) {
+                    out.push('That loan meets the LTV limit, but not the <strong>DTI</strong> limit. Also find the largest payment the back-end limit allows.');
+                }
+            });
+            return [...new Set(out)];
+        }
+
+        function bonusExplanation(inWorksheet) {
+            const b = cur.d.bonus;
+            if (!b) {
+                const a = cur.d.asApplied;
+                if (a.fails.includes('fico')) return `<p>No loan size changes the credit score. With a representative score of ${a.r.fico}, below ${a.L.fico}, no amount can be approved.</p>`;
+                return '<p>A smaller loan means a bigger down payment. At every loan small enough to pass the other limits, reserves fall short. No amount up to the one requested can be approved.</p>';
+            }
+            const why = b.binding === 'ltv' ? `the ${pctS(cur.d.asApplied.L.ltv, 0)} LTV limit` : b.binding === 'req' ? 'the amount requested' : `the ${b.limit * 100}% back-end DTI limit`;
+            return `<p>The largest approvable loan is <strong>$${fmt0(b.loan)}</strong>${b.drop ? `, with ${b.drop} removed from the loan` : ''}, set by ${why}.${inWorksheet ? '' : ' The walkthrough shows the working.'}</p>`;
+        }
+
+        function checkBonus(st) {
+            const none = $(`none-${st.id}`).checked;
+            const v = parseFloat($(`answer-${st.id}`).value);
+            if (!none && isNaN(v)) { feedback(st.id, 'Enter a loan amount, or tick the box if no amount works.', 'error'); return; }
+            cur.attempts++;
+            const b = cur.d.bonus;
+            const ok = b ? (!none && Math.abs(v - b.loan) <= TOL.bonus) : none;
+            const hint = $(`hint-${st.id}`);
+            if (ok) {
+                feedback(st.id, b ? `Correct! $${fmt0(b.loan)}` : 'Correct! No loan amount works.', 'success');
+                hint.innerHTML = `<div class="text-left max-w-xl mx-auto text-gray-700">${bonusExplanation()}</div>`;
+                showGif(CORRECT_GIFS[Math.floor(Math.random() * CORRECT_GIFS.length)]);
+                finishStep(st, true, none ? 'none' : v);
+                return;
+            }
+            let diag = [];
+            if (b && none) diag = ['A smaller loan does work here. Start from the back-end limit: find the largest payment it allows, then turn that into a loan amount.'];
+            else if (!b && !none) diag = bonusDiagnosis(v).concat(cur.d.asApplied.fails.includes('fico') ? ['No loan size changes the credit score.'] : []);
+            else diag = bonusDiagnosis(v);
+            if (cur.attempts === 1) {
+                feedback(st.id, 'Not quite. Try again.', 'error');
+                hint.innerHTML = `<p class="text-center text-gray-700">${stepHint('bonus', 0)}</p>` + amberBox(diag.map(m => `<p>&#9888;&#65039; ${m}</p>`).join(''));
+            } else {
+                feedback(st.id, b ? `The answer is $${fmt0(b.loan)}.` : 'The answer is: no loan amount works.', 'error');
+                hint.innerHTML = `<div class="text-left max-w-xl mx-auto text-gray-700">${bonusExplanation()}</div>` + amberBox(diag.map(m => `<p>&#9888;&#65039; ${m}</p>`).join('')) + walkButton(st);
+                wireWalkButtons(st.id);
+                showGif(INCORRECT_GIF);
+                finishStep(st, false, none ? 'none' : v);
+            }
+        }
+
+        // ===================== HINTS =====================
+        function stepHint(id, k) {
+            const s = cur.s, many = s.borrowers.length > 1;
+            const pool = {
+                ltv: [
+                    s.purpose === 'refi' ? `On a refinance there is no purchase price: the value is the appraisal${s.cashOut ? ', and the new loan is the current balance plus the cash out' : ''}.`
+                                         : 'Divide the loan by the value, where value is the lower of the purchase price and the appraisal.',
+                    s.downPct ? `Work out the loan first: the price less the ${s.downPct}% down payment.` : 'LTV is the loan amount divided by the property value.',
+                    s.va ? 'The VA funding fee is paid in cash at closing here, so it is not part of the loan.' : 'Up to 80% passes for a conventional loan.'
+                ],
+                fico: [
+                    "Take the middle of each borrower's three scores.",
+                    many ? 'With more than one borrower, the lender uses the lowest of the middle scores.' : 'The middle score is the one in the middle when the three are put in order.',
+                ],
+                front: [
+                    'Housing expense is principal and interest, plus taxes, insurance and any HOA dues, all monthly, divided by gross monthly income.',
+                    'Convert every income to monthly: semi-monthly times 2, bi-weekly times 26 then divide by 12, hourly times hours times 52 then divide by 12.',
+                    s.primaryPITI ? "For a second home, the housing ratio uses the primary residence's PITI." : s.rentPerUnit ? 'Count 75% of the rent from the unit that will be rented.' : 'Use P/YR = 1 for the payment: N in months and the annual rate divided by 12.',
+                    s.borrowers.some(b => b.selfEmployedYears < 2) ? 'Self-employment income needs a two-year history before it can be counted.' : 'Use gross income, before taxes.'
+                ],
+                back: [
+                    'Add every monthly debt payment to the housing expense, then divide by gross monthly income.',
+                    'Car loans, alimony and child support with 10 or fewer payments left are left out. Leases always count.',
+                    'Student loans given as a balance: 1% of the balance per month. Credit cards given as a balance: 5% of it.',
+                    s.primaryPITI ? "For a second home, the total adds the primary residence's PITI and the second home's PITI to the other debts." : 'Include the debts of every borrower on the loan as submitted.'
+                ],
+                reserves: [
+                    s.purpose === 'refi' ? 'On a refinance, cash to close is just the closing costs.' : `Cash to close is the down payment plus the closing costs${s.va ? ', plus the VA funding fee' : ''}.`,
+                    'Reserves are the verified assets left after cash to close, divided by the monthly PITI.',
+                    s.primaryPITI ? "In this course, second-home reserves are counted in months of the primary residence's PITI." : 'Divide by PITI, not by principal and interest alone.'
+                ],
+                decision: [
+                    s.va ? 'VA loans: LTV up to 100%, back-end DTI up to 41%, score of 620 or higher, and no reserve minimum.' : 'Conventional loans: LTV up to 80%, score of 620 or higher, reserves of 2 months or more, back-end DTI up to 45%.',
+                    s.va ? 'The front-end ratio is reported, but it is not a pass-or-fail limit.' : 'The back-end limit rises to 50% when the score is 720 or higher and reserves are at least 6 months.',
+                    droppable(s).length ? `A borrower who brings no usable income, like ${droppable(s).join(' or ')}, adds debts and may lower the score. Would the loan pass without them?` : 'The front-end ratio is reported, but it is not a pass-or-fail limit.'
+                ],
+                bonus: [
+                    'Find the largest monthly payment the back-end limit allows: the limit times income, less every other debt, less taxes, insurance and HOA. That leaves the largest principal and interest.',
+                    'Turn that largest payment into a loan amount with your calculator: N, I/YR and PMT in, solve for PV.',
+                    'Also cap the loan at the LTV limit, then check reserves at your answer: a smaller loan needs a bigger down payment.'
+                ]
+            }[id];
+            return pool[k % pool.length];
+        }
+
+        function showOnDemandHint() {
+            const st = activeSteps()[cur.idx];
+            if (!st || cur.results[st.id]) { openGuide(); return; }
+            const k = cur.lastHint[st.id] === undefined ? 0 : cur.lastHint[st.id] + 1;
+            cur.lastHint[st.id] = k;
+            feedback(st.id, `<p class="font-bold">&#128161; Hint</p><p class="mt-1 text-sm">${stepHint(st.id, k)}</p>`, 'info');
+        }
+
+        // ===================== COMPLETION & PROGRESS =====================
+        const PROGRESS_KEY = 'underwriting2026-progress';
+        function loadProgress() { try { return JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}'); } catch (e) { return {}; } }
+        function saveProgress(p) { try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(p)); } catch (e) { /* storage unavailable: progress lasts this visit only */ } }
+        let progress = loadProgress();
+
+        function showCompletion() {
+            const steps = activeSteps();
+            const score = steps.filter(st => cur.results[st.id] && cur.results[st.id].correct).length;
+            progress[cur.s.id] = { score, total: steps.length };
+            saveProgress(progress);
+            fillScenarioSelect();
+            $('summary').innerHTML = `<p class="font-semibold text-gray-700 mb-2">Score: ${score} / ${steps.length}</p>
+                <table class="w-full text-sm border-collapse">
+                    <thead><tr class="bg-gray-200"><th class="p-2 border text-left">Step</th><th class="p-2 border">Result</th></tr></thead>
+                    <tbody>${steps.map((st, i) => { const r = cur.results[st.id];
+                        return `<tr class="${r.correct ? 'bg-green-50' : 'bg-red-50'}"><td class="p-2 border text-left">${i + 1}. ${st.title}</td><td class="p-2 border text-center">${r.correct ? '&#10004;&#65039;' : '&#10060;'}</td></tr>`; }).join('')}</tbody>
+                </table>`;
+            $('completion').hidden = false;
+        }
+
+        function fillScenarioSelect() {
+            const sel = $('scenario-select'), keep = sel.value;
+            const opt = s => { const p = progress[s.id]; return `<option value="${s.id}">${p ? (p.score === p.total ? '&#10003; ' : `${p.score}/${p.total} `) : ''}${s.title}</option>`; };
+            sel.innerHTML = `<optgroup label="Workshop">${SCENARIOS.filter(s => s.source === 'workshop').map(opt).join('')}</optgroup>
+                <optgroup label="Practice scenarios">${SCENARIOS.filter(s => s.source !== 'workshop').map(opt).join('')}</optgroup>`;
+            if (keep) sel.value = keep;
+        }
+        function nextScenario() {
+            const i = SCENARIOS.findIndex(s => s.id === cur.s.id);
+            loadScenario(SCENARIOS[(i + 1) % SCENARIOS.length].id);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function showGif(url) {
+            $('gif-image').src = url;
+            $('gif-modal').style.display = 'flex';
+            setTimeout(() => { $('gif-modal').style.display = 'none'; }, 2000);
+        }
+
+        // ===================== WALKTHROUGH (laid out like the class example worksheet) =====================
+        function wsTable(cols, rows) {
+            return `<div class="overflow-x-auto"><table class="ws-table">
+                <thead><tr><th class="text-left">Item</th>${cols.map(c => `<th>${c}</th>`).join('')}<th class="text-left">How</th></tr></thead>
+                <tbody>${rows.map(r => `<tr class="${r.cls || ''}"><td class="text-left">${r.label}</td>${cols.map((c, i) => `<td class="num">${r.cells[i] ?? ''}</td>`).join('')}<td class="how">${r.how || ''}</td></tr>`).join('')}</tbody>
+            </table></div>`;
+        }
+        function money(v) { return v === null || v === undefined ? '' : `$${fmt(v)}`; }
+        function passMark(ok) { return ok ? '<span class="text-green-700 font-bold">&#10003; pass</span>' : '<span class="text-red-700 font-bold">&#10007; fail</span>'; }
+
+        function incomeHow(b, amount) {
+            const inc = b.income;
+            if (!inc) return 'no income';
+            if (b.selfEmployedYears !== undefined && b.selfEmployedYears < 2) return `self-employed ${b.selfEmployedYears < 1.5 ? b.selfEmployedYears + ' year' : b.selfEmployedYears + ' years'}: under 2 years, so not counted`;
+            switch (inc.type) {
+                case 'semimonthly': return `${fmt0(inc.amount)} semi-monthly &times; 2`;
+                case 'biweekly':    return `${fmt0(inc.amount)} bi-weekly &times; 26 &divide; 12`;
+                case 'hourly':      return `${inc.amount} an hour &times; ${inc.hours} hours &times; 52 &divide; 12`;
+                case 'monthly':     return 'monthly, as given';
+                case 'annual':      return `${fmt0(inc.amount)} &divide; 12`;
+                case 'commission': {
+                    const [r, p] = inc.years;
+                    return r.amount < p.amount ? `falling: use the lower, most recent year, ${fmt0(r.amount)} &divide; 12` : `two-year average of ${fmt0(r.amount)} and ${fmt0(p.amount)}, &divide; 12`;
+                }
+            }
+            return '';
+        }
+
+        function worksheetHTML() {
+            const s = cur.s, d = cur.d, a = d.asApplied, r = a.r;
+            const many = s.borrowers.length > 1;
+            const names = s.borrowers.map(b => b.name);
+            const cols = many ? [...names, 'Total'] : ['Amount'];
+            const T = many ? names.length : 0;                     // index of the Total column
+            const at = (i, v) => { const c = new Array(cols.length).fill(''); c[i] = v; return c; };
+            const tot = v => at(T, v);
+
+            // ---- Collateral
+            const loanHow = s.purpose === 'refi' ? `current balance ${fmt0(s.payoff)}${s.cashOut ? ` + cash out ${fmt0(s.cashOut)}` : ''}`
+                          : s.downPct ? `price ${fmt0(s.price)} less ${s.downPct}% down` : 'as given';
+            const valueHow = s.purpose === 'refi' ? 'refinance: the appraisal'
+                           : s.appraisal ? `lower of price ${fmt0(s.price)} and appraisal ${fmt0(s.appraisal)}` : 'purchase price (no appraisal given)';
+            const collateral = wsTable(['Value'], [
+                { label: 'Loan amount', cells: [money(r.loan)], how: loanHow },
+                { label: 'Value', cells: [money(r.value)], how: valueHow },
+                { label: '<strong>LTV</strong>', cls: 'ratio', cells: [`<strong>${pctS(r.ltv)}</strong>`], how: `loan &divide; value; limit ${pctS(a.L.ltv, 0)} ${passMark(!a.fails.includes('ltv'))}` },
+            ]);
+
+            // ---- Character
+            const character = wsTable(['Scores', 'Middle'], [
+                ...s.borrowers.map(b => ({ label: b.name, cells: [b.fico.join(', '), String(middleScore(b.fico))], how: 'middle of the three' })),
+                { label: '<strong>Representative score</strong>', cls: 'ratio', cells: ['', `<strong>${r.fico}</strong>`], how: `${many ? 'lowest of the middle scores; ' : ''}minimum ${a.L.fico} ${passMark(!a.fails.includes('fico'))}` },
+            ]);
+
+            // ---- Capacity: income and housing
+            const incomeRows = s.borrowers.map((b, i) => ({ label: `Income: ${b.name}`, cells: at(many ? i : 0, money(r.incomes[i])), how: incomeHow(b, r.incomes[i]) }));
+            if (many) incomeRows.forEach((row, i) => { row.cells = at(i, money(r.incomes[i])); });
+            if (s.rentPerUnit) incomeRows.push({ label: 'Rental income', cells: tot(money(r.rental)), how: `75% of ${fmt0(s.rentPerUnit)} rent` });
+            incomeRows.push({ label: '<strong>Gross monthly income</strong>', cls: 'subtotal', cells: tot(`<strong>${money(r.income)}</strong>`) });
+            const taxHow = !s.taxes ? `not given: 1.25% of ${fmt0(s.price)} &divide; 12` : s.taxes.per === 'half' ? `${fmt0(s.taxes.amount)} twice a year &times; 2 &divide; 12` : s.taxes.per === 'year' ? `${fmt0(s.taxes.amount)} &divide; 12` : 'monthly, as given';
+            const insHow = !s.insurance ? '' : s.insurance.per === 'half' ? `${fmt(s.insurance.amount)} every six months &times; 2 &divide; 12` : `${fmt0(s.insurance.amount)} &divide; 12`;
+            const piHow = `P/YR 1: N ${s.term * 12}, I/YR ${s.rate} &divide; 12, PV ${fmt0(r.loan)}, FV 0, solve PMT &middot; Excel <span class="font-mono">=PMT(${s.rate}%/12, ${s.term * 12}, -${r.loan})</span>`;
+            const housingRows = [
+                { label: 'P &amp; I', cells: tot(money(r.pi)), how: piHow },
+                { label: 'Taxes', cells: tot(money(r.taxes)), how: taxHow },
+            ];
+            if (r.ins) housingRows.push({ label: 'Insurance', cells: tot(money(r.ins)), how: insHow });
+            if (r.hoa) housingRows.push({ label: 'HOA', cells: tot(money(r.hoa)), how: 'monthly, as given' });
+            if (s.primaryPITI) {
+                housingRows.push({ label: 'Second home PITI', cls: 'subtotal', cells: tot(money(r.subjectPITI)), how: 'joins the other debts in the back-end total' });
+                housingRows.push({ label: '<strong>Housing expense: primary residence PITI</strong>', cls: 'subtotal', cells: tot(`<strong>${money(r.housing)}</strong>`), how: 'as given; the housing ratio uses the primary residence' });
+            } else {
+                housingRows.push({ label: '<strong>Housing expense (PITI)</strong>', cls: 'subtotal', cells: tot(`<strong>${money(r.housing)}</strong>`) });
+            }
+            housingRows.push({ label: '<strong>Front-end DTI</strong>', cls: 'ratio', cells: tot(`<strong>${pctS(r.front)}</strong>`), how: 'housing expense &divide; income; reported, not a pass-or-fail limit' });
+            const capacity = wsTable(cols, [...incomeRows, ...housingRows]);
+
+            // ---- Capacity: debts
+            const debtRows = r.debtRows.map(dr => {
+                const bi = names.indexOf(dr.borrower);
+                const excluded = dr.amount === 0 && /excluded/.test(dr.note);
+                const shown = excluded ? `<span class="line-through text-gray-400">$${fmt(dr.debt.payment)}</span>` : money(dr.amount);
+                return { label: debtLine(dr.debt).replace(/ per month.*$/, '').replace(/ of \$[\d,]+$/, ''), cells: at(many ? bi : 0, shown), how: dr.note };
+            });
+            if (many) debtRows.push({ label: 'Debts by borrower', cls: 'subtotal', cells: [...names.map(n => money(r.debtRows.filter(x => x.borrower === n).reduce((t, x) => t + x.amount, 0))), money(r.debts)] });
+            debtRows.push({ label: 'Housing expense', cells: tot(money(r.housing)) });
+            if (s.primaryPITI) debtRows.push({ label: 'Second home PITI', cells: tot(money(r.subjectPITI)) });
+            debtRows.push({ label: '<strong>Total expense</strong>', cls: 'subtotal', cells: tot(`<strong>${money(r.totalExp)}</strong>`) });
+            debtRows.push({ label: '<strong>Back-end DTI</strong>', cls: 'ratio', cells: tot(`<strong>${pctS(r.back)}</strong>`),
+                how: `total &divide; income; limit ${pctS(a.backLimit, 0)}${a.comp ? ' (score 720+ and 6+ months reserves)' : ''} ${passMark(!a.fails.includes('dti'))}` });
+            const debts = wsTable(cols, debtRows);
+
+            // ---- Capital
+            const capRows = s.borrowers.filter(b => b.assets).map(b => ({ label: `Verified assets: ${b.name}`, cells: many ? at(names.indexOf(b.name), money(b.assets)) : tot(money(b.assets)) }));
+            if (many) capRows.push({ label: 'Verified assets', cls: 'subtotal', cells: tot(money(r.assets)) });
+            if (s.purpose !== 'refi') capRows.push({ label: 'Down payment', cells: tot(money(r.down)), how: 'price less loan' });
+            if (s.va) capRows.push({ label: 'VA funding fee', cells: tot(money(r.vaFee)), how: '2.15% of the loan, paid in cash' });
+            capRows.push({ label: 'Closing costs', cells: tot(money(r.closing)) });
+            capRows.push({ label: 'Cash to close', cls: 'subtotal', cells: tot(money(r.cashToClose)), how: s.purpose === 'refi' ? 'refinance: closing costs only; cash out is not counted' : '' });
+            capRows.push({ label: 'Reserves', cells: tot(money(r.reserves)), how: 'assets less cash to close' });
+            capRows.push({ label: '<strong>Months of PITI</strong>', cls: 'ratio', cells: tot(`<strong>${r.months.toFixed(2)}</strong>`),
+                how: `reserves &divide; ${s.primaryPITI ? 'primary residence PITI' : 'PITI'}; ${a.L.months ? `minimum ${a.L.months} months ${passMark(!a.fails.includes('reserves'))}` : 'no VA minimum'}` });
+            const capital = wsTable(cols.length > 1 ? cols : ['Amount'], capRows);
+
+            // ---- Decision
+            const dec = d.decision === 'approve' ? 'Approve as submitted' : d.decision === 'drop' ? `Approve after removing ${d.drop}` : 'Deny';
+            const decision = `<p class="text-sm text-gray-700">${decisionExplanation()}</p>
+                <p class="mt-2 text-base font-bold text-gray-900">Decision: ${dec}</p>`;
+
+            // ---- Bonus
+            let bonus = '';
+            if (d.decision === 'deny') {
+                const b = d.bonus;
+                const drop = b ? (b.drop ? [b.drop] : []) : (droppable(s).length ? [droppable(s)[0]] : []);
+                const base = underwrite(s, drop);
+                const L = a.L;
+                const lim = b ? b.limit : (L.backComp && base.fico >= L.compFico ? L.backComp : L.back);
+                const maxTotal = lim * base.income;
+                const others = base.debts + (s.primaryPITI || 0);
+                const tih = base.taxes + base.ins + base.hoa;
+                const maxPI = maxTotal - others - tih;
+                const dtiCap = maxPI > 0 ? presentValue(maxPI, s.rate, s.term) : 0;
+                const ltvCap = L.ltv * base.value;
+                const rows = [
+                    { label: `Income${drop.length ? ` (without ${drop[0]})` : ''}`, cells: [money(base.income)] },
+                    { label: `Largest total payments at ${lim * 100}%`, cells: [money(maxTotal)], how: `${lim * 100}% of income` },
+                    { label: `Less other debts${s.primaryPITI ? ' and primary PITI' : ''}`, cells: [money(others)] },
+                    { label: 'Less taxes, insurance, HOA', cells: [money(tih)] },
+                    { label: '<strong>Largest P &amp; I</strong>', cls: 'subtotal', cells: [`<strong>${money(maxPI)}</strong>`] },
+                    { label: 'Largest loan the DTI allows', cells: [maxPI > 0 ? money(dtiCap) : 'none'], how: `P/YR 1: N ${s.term * 12}, I/YR ${s.rate} &divide; 12, PMT ${fmt(Math.max(maxPI, 0))}, FV 0, solve PV` },
+                    { label: 'Largest loan the LTV allows', cells: [money(ltvCap)], how: `${pctS(L.ltv, 0)} of ${fmt0(base.value)}` },
+                    { label: 'Amount requested', cells: [money(requestedLoan(s))] },
+                ];
+                if (b) {
+                    const e = b.eval.r;
+                    rows.push({ label: '<strong>Smallest of the three</strong>', cls: 'ratio', cells: [`<strong>$${fmt0(b.loan)}</strong>`], how: 'rounded down to the dollar' });
+                    rows.push({ label: 'Reserves at that loan', cells: [`${e.months.toFixed(2)} months`], how: L.months ? `minimum ${L.months} ${passMark(true)}` : 'no VA minimum' });
+                } else {
+                    const tryLoan = Math.floor(Math.min(dtiCap, ltvCap, requestedLoan(s)));
+                    if (a.fails.includes('fico')) rows.push({ label: '<strong>Result</strong>', cls: 'ratio', cells: ['<strong>none</strong>'], how: 'no loan size changes the credit score' });
+                    else if (tryLoan > 0) {
+                        const e = underwrite(s, drop, tryLoan);
+                        rows.push({ label: 'Reserves at the smallest of the three', cells: [`${e.months.toFixed(2)} months`], how: `minimum ${L.months} ${passMark(false)}` });
+                        rows.push({ label: '<strong>Result</strong>', cls: 'ratio', cells: ['<strong>none</strong>'], how: 'a smaller loan means a bigger down payment, so reserves only get worse' });
+                    } else rows.push({ label: '<strong>Result</strong>', cls: 'ratio', cells: ['<strong>none</strong>'], how: 'the other debts already use up the DTI limit' });
+                }
+                bonus = `<h4 id="ws-bonus" class="ws-h">Bonus: largest loan you could approve</h4>${wsTable(['Amount'], rows)}<p class="text-sm text-gray-700 mt-2">${bonusExplanation(true)}</p>`;
+            }
+
+            return `<h3 class="text-2xl font-bold mb-1">Walkthrough</h3>
+                <p class="text-gray-600 mb-3">${s.title}</p>
+                <p class="text-sm text-gray-600 mb-4">Laid out like the class example worksheet: one section for each of the four Cs, then the decision.</p>
+                <h4 id="ws-collateral" class="ws-h">Collateral (LTV)</h4>${collateral}
+                <h4 id="ws-character" class="ws-h">Character (credit score)</h4>${character}
+                <h4 id="ws-capacity" class="ws-h">Capacity (DTI): income and housing expense</h4>${capacity}
+                <h4 id="ws-debts" class="ws-h">Capacity (DTI): debts</h4>${debts}
+                <h4 id="ws-capital" class="ws-h">Capital (reserves)</h4>${capital}
+                <h4 id="ws-decision" class="ws-h">Decision</h4>${decision}
+                ${bonus}`;
+        }
+
+        function openWorksheet(anchor) {
+            $('modal-body').innerHTML = worksheetHTML();
+            $('walkthrough-modal').style.display = 'flex';
+            const target = anchor && document.getElementById(anchor);
+            if (target) target.scrollIntoView({ block: 'start' }); else $('modal-body').parentElement.scrollTop = 0;
+        }
+
+        // ===================== CONCEPT GUIDE =====================
+        function guideHTML() {
+            return `<h3 class="text-2xl font-bold mb-4">Concept Guide: Underwriting with the Four Cs</h3>
+            <p class="text-sm text-gray-700 mb-4">An underwriter asks four questions about every loan, one for each of the four Cs of credit. Each has a measure and a limit. The loan is approved only when all four pass.</p>
+
+            <h4 id="guide-standards" class="ws-h">The approval standards</h4>
+            <div class="overflow-x-auto"><table class="ws-table">
+                <thead><tr><th class="text-left">C</th><th class="text-left">Question</th><th class="text-left">Measure</th><th>Conventional</th><th>VA</th></tr></thead>
+                <tbody>
+                    <tr><td class="text-left font-semibold">Collateral</td><td class="text-left">Is the property worth enough to protect the lender?</td><td class="text-left">LTV</td><td>80% or less</td><td>100% or less</td></tr>
+                    <tr><td class="text-left font-semibold">Character</td><td class="text-left">Does the borrower repay debts?</td><td class="text-left">Representative score</td><td>620 or higher</td><td>620 or higher</td></tr>
+                    <tr><td class="text-left font-semibold">Capacity</td><td class="text-left">Can the borrower afford the payment?</td><td class="text-left">Back-end DTI</td><td>45% or less; 50% with compensating factors</td><td>41% or less</td></tr>
+                    <tr><td class="text-left font-semibold">Capital</td><td class="text-left">Is there a cushion if income stops?</td><td class="text-left">Months of PITI left after closing</td><td>2 months or more</td><td>no minimum</td></tr>
+                </tbody>
+            </table></div>
+            <p class="text-sm text-gray-700 mt-2"><strong>Compensating factors:</strong> the conventional back-end limit rises from 45% to 50% when the representative score is 720 or higher <em>and</em> reserves are at least 6 months. The front-end ratio is always reported, but it is not a pass-or-fail limit.</p>
+
+            <h4 class="ws-h">Collateral</h4>
+            <ul class="guide-list">
+                <li>For a purchase, value is the <strong>lower</strong> of the purchase price and the appraisal. For a refinance, it is the appraisal.</li>
+                <li>A refinance loan is the current balance plus any cash out.</li>
+                <li>Here the VA funding fee is paid in cash at closing, so it is not added to the loan.</li>
+            </ul>
+
+            <h4 class="ws-h">Character</h4>
+            <ul class="guide-list">
+                <li>Each borrower has three scores. Use the <strong>middle</strong> one.</li>
+                <li>With more than one borrower, the representative score is the <strong>lowest</strong> of their middle scores.</li>
+            </ul>
+
+            <h4 class="ws-h">Capacity: income</h4>
+            <ul class="guide-list">
+                <li>Everything is gross monthly income. Semi-monthly pay times 2. Bi-weekly pay times 26, then divide by 12. Hourly pay times hours times 52, then divide by 12. Annual pay divided by 12.</li>
+                <li>Commission: look at both years. If the most recent year is lower, use it; otherwise use the two-year average.</li>
+                <li>Self-employment income needs a <strong>two-year</strong> history. With less, it cannot be counted.</li>
+                <li>Rent from a unit that will be rented out counts at <strong>75%</strong>, allowing for vacancy and upkeep.</li>
+            </ul>
+
+            <h4 class="ws-h">Capacity: housing expense and debts</h4>
+            <ul class="guide-list">
+                <li>Housing expense (PITI) is principal and interest, taxes, insurance and any HOA dues, all monthly.</li>
+                <li>Second home: the housing ratio uses the <strong>primary residence's</strong> PITI. The second home's PITI goes into the back-end total with the other debts.</li>
+                <li>Student loans at 0% with 100 payments: 1% of the balance per month, unless a payment is given.</li>
+                <li>Credit cards given as a balance: a minimum payment of 5% of the balance.</li>
+                <li>Car loans and other installment debts, alimony and child support with <strong>10 or fewer</strong> payments left are excluded.</li>
+                <li><strong>Leases always count</strong>, however few payments remain. When one ends, the borrower almost always leases another car.</li>
+                <li>A rental property that loses money each month counts the loss as a debt.</li>
+            </ul>
+
+            <h4 class="ws-h">Capital</h4>
+            <ul class="guide-list">
+                <li>Cash to close is the down payment plus the closing costs, plus the VA funding fee on a VA loan. On a refinance it is the closing costs; cash out does not count toward reserves.</li>
+                <li>Reserves are the verified assets left after cash to close, counted in months of PITI. For a second home, this course counts them in months of the primary residence's PITI.</li>
+            </ul>
+
+            <h4 class="ws-h">Removing a borrower</h4>
+            <p class="text-sm text-gray-700">A co-borrower who brings no usable income still brings debts and a credit score. Because the representative score is the lowest middle score, a weak co-borrower can sink the whole loan. If removing them makes every limit pass, approve without them.</p>
+
+            <h4 class="ws-h">Bonus: the largest loan you could approve</h4>
+            <ol class="list-decimal list-inside text-sm text-gray-700 space-y-1">
+                <li>Multiply income by the back-end limit: the most the borrower can pay toward debts each month.</li>
+                <li>Subtract every other debt (and, for a second home, the primary residence's PITI), then taxes, insurance and HOA. What is left is the largest principal and interest.</li>
+                <li>Turn that payment into a loan: on the calculator, N, I/YR and PMT in, solve for PV.</li>
+                <li>Compare it with the LTV limit and the amount requested, and take the smallest.</li>
+                <li>Check reserves at that loan. A smaller loan needs a bigger down payment, so reserves fall. If they fail, no smaller loan will work.</li>
+            </ol>
+            <p class="text-sm text-gray-700 mt-2">If the credit score is the problem, no loan size fixes it.</p>`;
+        }
+        function openGuide(anchor) {
+            $('modal-body').innerHTML = guideHTML();
+            $('walkthrough-modal').style.display = 'flex';
+            const t = anchor && document.getElementById(anchor);
+            if (t) t.scrollIntoView({ block: 'start' }); else $('modal-body').parentElement.scrollTop = 0;
+        }
+
+        // ===================== WIRING =====================
+        $('concept-guide-btn').addEventListener('click', () => openGuide());
+        $('hint-btn').addEventListener('click', showOnDemandHint);
+        $('walkthrough-btn').addEventListener('click', () => {
+            const st = activeSteps()[cur.idx];
+            openWorksheet(st ? st.ws : 'ws-collateral');
+        });
+        $('scenario-select').addEventListener('change', e => loadScenario(e.target.value));
+        $('next-scenario').addEventListener('click', nextScenario);
+        $('next-scenario-2').addEventListener('click', nextScenario);
+        $('restart-scenario').addEventListener('click', () => loadScenario(cur.s.id));
+        $('close-modal-btn').addEventListener('click', () => { $('walkthrough-modal').style.display = 'none'; });
+        window.addEventListener('click', e => {
+            if (e.target === $('walkthrough-modal')) $('walkthrough-modal').style.display = 'none';
+            if (e.target === $('gif-modal')) $('gif-modal').style.display = 'none';
+        });
+        window.addEventListener('keydown', e => {
+            if (e.key === 'Escape') { $('walkthrough-modal').style.display = 'none'; $('gif-modal').style.display = 'none'; }
+        });
+
+        window.onload = () => {
+            fillScenarioSelect();
+            loadScenario(SCENARIOS[0].id);
+        };
+    </script>
+</body>
+</html>
