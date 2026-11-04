@@ -540,7 +540,7 @@
             out.push(taxSentence(s.taxes), insuranceSentence(s.insurance));
             if (s.hoa) out.push(s.insurance
                 ? `HOA dues are $${fmt0(s.hoa)} per month.`
-                : `HOA dues are $${fmt0(s.hoa)} per month and include the required insurance coverage, so there is no separate insurance payment.`);
+                : `HOA dues are $${fmt0(s.hoa)} per month and include the required insurance coverage.`);
             if (s.rentPerUnit) out.push(`Each unit rents for $${fmt0(s.rentPerUnit)} per month.`);
             if (s.primaryPITI) out.push(`PITI on the primary residence is $${fmt0(s.primaryPITI)} per month.`);
             return out.filter(Boolean).join(' ');
