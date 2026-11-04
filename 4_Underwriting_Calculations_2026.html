@@ -538,7 +538,9 @@
             out.push(`${who} ${has} locked in a ${s.term}-year fixed rate loan at ${s.rate}% with $${fmt0(s.closing)} in closing costs${s.va ? ' (excluding the VA funding fee)' : ''}.`);
             if (s.va) out.push('The VA funding fee is 2.15% of the loan amount, paid in cash at closing.');
             out.push(taxSentence(s.taxes), insuranceSentence(s.insurance));
-            if (s.hoa) out.push(`HOA dues are $${fmt0(s.hoa)} per month.`);
+            if (s.hoa) out.push(s.insurance
+                ? `HOA dues are $${fmt0(s.hoa)} per month.`
+                : `HOA dues are $${fmt0(s.hoa)} per month and include the required insurance coverage, so there is no separate insurance payment.`);
             if (s.rentPerUnit) out.push(`Each unit rents for $${fmt0(s.rentPerUnit)} per month.`);
             if (s.primaryPITI) out.push(`PITI on the primary residence is $${fmt0(s.primaryPITI)} per month.`);
             return out.filter(Boolean).join(' ');
@@ -1163,7 +1165,7 @@
                 { label: 'Taxes', cells: tot(money(r.taxes)), how: taxHow },
             ];
             if (r.ins) housingRows.push({ label: 'Insurance', cells: tot(money(r.ins)), how: insHow });
-            if (r.hoa) housingRows.push({ label: 'HOA', cells: tot(money(r.hoa)), how: 'monthly, as given' });
+            if (r.hoa) housingRows.push({ label: 'HOA', cells: tot(money(r.hoa)), how: s.insurance ? 'monthly, as given' : 'monthly, as given; includes the required insurance, so there is no separate insurance line' });
             if (s.primaryPITI) {
                 housingRows.push({ label: 'Second home PITI', cls: 'subtotal', cells: tot(money(r.subjectPITI)), how: 'joins the other debts in the back-end total' });
                 housingRows.push({ label: '<strong>Housing expense: primary residence PITI</strong>', cls: 'subtotal', cells: tot(`<strong>${money(r.housing)}</strong>`), how: 'as given; the housing ratio uses the primary residence' });
